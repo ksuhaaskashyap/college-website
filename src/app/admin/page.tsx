@@ -222,6 +222,35 @@ export default function AdminPage() {
           </button>
 
 
+          {/* POLLS */}
+
+          <button
+            onClick={() =>
+              router.push("/admin/polls")
+            }
+            className="group rounded-3xl border border-white/10 bg-white/[0.04] p-7 text-left transition hover:-translate-y-1 hover:bg-white/[0.08]"
+          >
+
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/10 text-3xl">
+              📊
+            </div>
+
+            <h2 className="mt-6 text-xl font-black">
+              Polls
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-white/40">
+              View poll results, vote counts and
+              see what students are choosing.
+            </p>
+
+            <p className="mt-6 text-sm font-bold text-purple-400">
+              View poll results →
+            </p>
+
+          </button>
+
+
           {/* NOTIFICATIONS */}
 
           <button
@@ -288,6 +317,15 @@ export default function AdminPage() {
               className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-white/60 transition hover:bg-white/5 hover:text-white"
             >
               👥 Registrations
+            </button>
+
+            <button
+              onClick={() =>
+                router.push("/admin/polls")
+              }
+              className="rounded-xl border border-purple-400/20 px-5 py-3 text-sm font-bold text-purple-300 transition hover:bg-purple-400/10 hover:text-purple-200"
+            >
+              📊 Poll Results
             </button>
 
             <button

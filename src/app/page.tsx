@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   collection,
+  doc,
   onSnapshot,
   query,
-  Timestamp,
   where,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { motion, type Variants } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 
 type EventItem = {
@@ -20,6 +22,7 @@ type EventItem = {
   venue: string;
   category: string;
   registrationLink?: string;
+  imageUrl?: string;
   published: boolean;
 };
 
@@ -28,64 +31,75 @@ type NotificationItem = {
   title: string;
   message: string;
   type: string;
-  published: boolean;
-  createdAt?: Timestamp;
-  expiresAt?: Timestamp | null;
+  published?: boolean;
+
+  // Personal notification fields
+  recipientId?: string;
+  actorId?: string;
+  postId?: string;
+
+  // Read state
+  read?: boolean;
+
+  createdAt?: any;
+};
+
+const fadeUp: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: "easeOut",
+    },
+  },
+};
+
+const stagger: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
 };
 
 export default function Home() {
+  const router = useRouter();
+
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  // EVENT LOADING / ERROR
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [eventsError, setEventsError] = useState(false);
-  const [eventsRetry, setEventsRetry] = useState(0);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
+  const [notifications, setNotifications] = useState<
+    NotificationItem[]
+  >([]);
 
-  // -----------------------------------------
-  // AUTH
-  // -----------------------------------------
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user);
+  const [loadingNotifications, setLoadingNotifications] =
+    useState(true);
 
-      if (!user) {
-        setNotifications([]);
-      }
-    });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-    return () => unsubscribe();
-  }, []);
+  const [userEmail, setUserEmail] = useState("");
 
-  // -----------------------------------------
-  // CLOCK
-  // -----------------------------------------
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 30000);
+  const [showNotifications, setShowNotifications] =
+    useState(false);
 
-    return () => clearInterval(timer);
-  }, []);
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
 
-  // -----------------------------------------
+  const [readNotificationIds, setReadNotificationIds] =
+    useState<string[]>([]);
+
+  // ============================================================
   // EVENTS
-  // -----------------------------------------
-  useEffect(() => {
-    setLoadingEvents(true);
-    setEventsError(false);
+  // ============================================================
 
+  useEffect(() => {
     const eventsQuery = query(
       collection(db, "events"),
       where("published", "==", true)
@@ -94,654 +108,1524 @@ export default function Home() {
     const unsubscribe = onSnapshot(
       eventsQuery,
       (snapshot) => {
-        const eventData: EventItem[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<EventItem, "id">),
-        }));
+        const eventList = snapshot.docs.map((eventDoc) => ({
+          id: eventDoc.id,
+          ...eventDoc.data(),
+        })) as EventItem[];
 
-        eventData.sort((a, b) => {
-          return a.date.localeCompare(b.date);
-        });
+        eventList.sort((a, b) =>
+          a.date.localeCompare(b.date)
+        );
 
-        setEvents(eventData);
+        setEvents(eventList);
         setLoadingEvents(false);
-        setEventsError(false);
       },
       (error) => {
-        console.error("Error loading events:", error);
-
-        setEvents([]);
+        console.error("Failed to load events:", error);
         setLoadingEvents(false);
-        setEventsError(true);
       }
     );
 
     return () => unsubscribe();
-  }, [eventsRetry]);
+  }, []);
 
-  // -----------------------------------------
-  // NOTIFICATIONS
-  // -----------------------------------------
+  // ============================================================
+  // LOAD LOCALLY READ NOTIFICATIONS
+  // ============================================================
+
   useEffect(() => {
     if (!isLoggedIn) {
-      setNotifications([]);
+      setReadNotificationIds([]);
       return;
     }
 
-    const neverExpiresQuery = query(
-      collection(db, "notifications"),
-      where("published", "==", true),
-      where("expiresAt", "==", null)
-    );
+    const user = auth.currentUser;
 
-    const activeExpiryQuery = query(
-      collection(db, "notifications"),
-      where("published", "==", true),
-      where("expiresAt", ">", Timestamp.now())
-    );
+    if (!user) {
+      return;
+    }
 
-    let neverExpires: NotificationItem[] = [];
-    let activeExpiry: NotificationItem[] = [];
+    const storageKey =
+      `campus-vibe-read-notifications-${user.uid}`;
 
-    const updateNotifications = () => {
-      const combined = [...neverExpires, ...activeExpiry];
+    try {
+      const stored = localStorage.getItem(storageKey);
 
-      const uniqueNotifications = Array.from(
-        new Map(combined.map((item) => [item.id, item])).values()
+      if (stored) {
+        const parsed = JSON.parse(stored);
+
+        if (Array.isArray(parsed)) {
+          setReadNotificationIds(parsed);
+        }
+      } else {
+        setReadNotificationIds([]);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load notification read state:",
+        error
       );
 
-      uniqueNotifications.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis() ?? 0;
-        const bTime = b.createdAt?.toMillis() ?? 0;
+      setReadNotificationIds([]);
+    }
+  }, [isLoggedIn]);
 
-        return bTime - aTime;
-      });
+  // ============================================================
+  // AUTH + ADMIN + NOTIFICATIONS
+  // ============================================================
 
-      setNotifications(uniqueNotifications);
-    };
+  useEffect(() => {
+    let unsubscribeAdmin: (() => void) | null = null;
 
-    const unsubscribeNever = onSnapshot(
-      neverExpiresQuery,
-      (snapshot) => {
-        neverExpires = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<NotificationItem, "id">),
-        }));
+    let unsubscribeGlobalNotifications:
+      | (() => void)
+      | null = null;
 
-        updateNotifications();
-      },
-      (error) => {
-        console.error("Error loading notifications:", error);
-      }
-    );
+    let unsubscribePersonalNotifications:
+      | (() => void)
+      | null = null;
 
-    const unsubscribeActive = onSnapshot(
-      activeExpiryQuery,
-      (snapshot) => {
-        activeExpiry = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<NotificationItem, "id">),
-        }));
+    const unsubscribeAuth = onAuthStateChanged(
+      auth,
+      (user) => {
+        // --------------------------------------------------------
+        // LOGGED OUT
+        // --------------------------------------------------------
 
-        updateNotifications();
-      },
-      (error) => {
-        console.error("Error loading active notifications:", error);
+        if (!user) {
+          setIsLoggedIn(false);
+          setIsAdmin(false);
+          setUserEmail("");
+          setNotifications([]);
+          setLoadingNotifications(false);
+
+          if (unsubscribeAdmin) {
+            unsubscribeAdmin();
+            unsubscribeAdmin = null;
+          }
+
+          if (unsubscribeGlobalNotifications) {
+            unsubscribeGlobalNotifications();
+            unsubscribeGlobalNotifications = null;
+          }
+
+          if (unsubscribePersonalNotifications) {
+            unsubscribePersonalNotifications();
+            unsubscribePersonalNotifications = null;
+          }
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // LOGGED IN
+        // --------------------------------------------------------
+
+        setIsLoggedIn(true);
+        setUserEmail(user.email || "");
+        setLoadingNotifications(true);
+
+        // --------------------------------------------------------
+        // ADMIN CHECK
+        // --------------------------------------------------------
+
+        try {
+          const adminRef = doc(
+            db,
+            "admins",
+            user.uid
+          );
+
+          unsubscribeAdmin = onSnapshot(
+            adminRef,
+            (adminSnapshot) => {
+              if (!adminSnapshot.exists()) {
+                setIsAdmin(false);
+                return;
+              }
+
+              const adminData = adminSnapshot.data();
+
+              setIsAdmin(
+                adminData?.role === "admin"
+              );
+            },
+            (error) => {
+              console.error(
+                "Failed to check admin status:",
+                error
+              );
+
+              setIsAdmin(false);
+            }
+          );
+        } catch (error) {
+          console.error(
+            "Admin check failed:",
+            error
+          );
+
+          setIsAdmin(false);
+        }
+
+        // --------------------------------------------------------
+        // GLOBAL NOTIFICATIONS
+        // --------------------------------------------------------
+
+        const globalNotificationsQuery = query(
+          collection(db, "notifications"),
+          where("published", "==", true)
+        );
+
+        unsubscribeGlobalNotifications =
+          onSnapshot(
+            globalNotificationsQuery,
+            (snapshot) => {
+              const globalNotifications =
+                snapshot.docs.map(
+                  (notificationDoc) => ({
+                    id: notificationDoc.id,
+                    ...notificationDoc.data(),
+                  })
+                ) as NotificationItem[];
+
+              setNotifications((current) => {
+                const personalNotifications =
+                  current.filter(
+                    (notification) =>
+                      notification.recipientId ===
+                      user.uid
+                  );
+
+                const combined = [
+                  ...globalNotifications,
+                  ...personalNotifications,
+                ];
+
+                const uniqueMap = new Map<
+                  string,
+                  NotificationItem
+                >();
+
+                combined.forEach(
+                  (notification) => {
+                    uniqueMap.set(
+                      notification.id,
+                      notification
+                    );
+                  }
+                );
+
+                const uniqueNotifications =
+                  Array.from(
+                    uniqueMap.values()
+                  );
+
+                uniqueNotifications.sort(
+                  (a, b) => {
+                    const aTime =
+                      a.createdAt?.toMillis?.() ||
+                      0;
+
+                    const bTime =
+                      b.createdAt?.toMillis?.() ||
+                      0;
+
+                    return bTime - aTime;
+                  }
+                );
+
+                return uniqueNotifications;
+              });
+
+              setLoadingNotifications(false);
+            },
+            (error) => {
+              console.error(
+                "Failed to load global notifications:",
+                error
+              );
+
+              setLoadingNotifications(false);
+            }
+          );
+
+        // --------------------------------------------------------
+        // PERSONAL NOTIFICATIONS
+        // --------------------------------------------------------
+
+        const personalNotificationsQuery =
+          query(
+            collection(db, "notifications"),
+            where(
+              "recipientId",
+              "==",
+              user.uid
+            )
+          );
+
+        unsubscribePersonalNotifications =
+          onSnapshot(
+            personalNotificationsQuery,
+            (snapshot) => {
+              const personalNotifications =
+                snapshot.docs.map(
+                  (notificationDoc) => ({
+                    id: notificationDoc.id,
+                    ...notificationDoc.data(),
+                  })
+                ) as NotificationItem[];
+
+              setNotifications((current) => {
+                const globalNotifications =
+                  current.filter(
+                    (notification) =>
+                      !notification.recipientId
+                  );
+
+                const combined = [
+                  ...globalNotifications,
+                  ...personalNotifications,
+                ];
+
+                const uniqueMap = new Map<
+                  string,
+                  NotificationItem
+                >();
+
+                combined.forEach(
+                  (notification) => {
+                    uniqueMap.set(
+                      notification.id,
+                      notification
+                    );
+                  }
+                );
+
+                const uniqueNotifications =
+                  Array.from(
+                    uniqueMap.values()
+                  );
+
+                uniqueNotifications.sort(
+                  (a, b) => {
+                    const aTime =
+                      a.createdAt?.toMillis?.() ||
+                      0;
+
+                    const bTime =
+                      b.createdAt?.toMillis?.() ||
+                      0;
+
+                    return bTime - aTime;
+                  }
+                );
+
+                return uniqueNotifications;
+              });
+
+              setLoadingNotifications(false);
+            },
+            (error) => {
+              console.error(
+                "Failed to load personal notifications:",
+                error
+              );
+            }
+          );
       }
     );
 
     return () => {
-      unsubscribeNever();
-      unsubscribeActive();
+      unsubscribeAuth();
+
+      if (unsubscribeAdmin) {
+        unsubscribeAdmin();
+      }
+
+      if (unsubscribeGlobalNotifications) {
+        unsubscribeGlobalNotifications();
+      }
+
+      if (unsubscribePersonalNotifications) {
+        unsubscribePersonalNotifications();
+      }
     };
-  }, [isLoggedIn, currentTime]);
+  }, []);
 
-  // -----------------------------------------
-  // HELPERS
-  // -----------------------------------------
-  const formatDate = (date: string) => {
-    if (!date) return "Date TBA";
+  // ============================================================
+  // NOTIFICATION HELPERS
+  // ============================================================
 
-    const parsedDate = new Date(date);
+  function isNotificationRead(
+    notification: NotificationItem
+  ) {
+    return (
+      notification.read === true ||
+      readNotificationIds.includes(
+        notification.id
+      )
+    );
+  }
 
-    if (Number.isNaN(parsedDate.getTime())) {
-      return date;
+  const unreadNotifications =
+    notifications.filter(
+      (notification) =>
+        !isNotificationRead(notification)
+    );
+
+  // ============================================================
+  // MARK NOTIFICATION AS READ
+  // ============================================================
+
+  function markNotificationAsRead(
+    notificationId: string
+  ) {
+    if (
+      readNotificationIds.includes(
+        notificationId
+      )
+    ) {
+      return;
     }
 
-    return parsedDate.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+    const user = auth.currentUser;
+
+    if (!user) {
+      return;
+    }
+
+    const nextReadIds = [
+      ...readNotificationIds,
+      notificationId,
+    ];
+
+    setReadNotificationIds(nextReadIds);
+
+    try {
+      localStorage.setItem(
+        `campus-vibe-read-notifications-${user.uid}`,
+        JSON.stringify(nextReadIds)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save notification read state:",
+        error
+      );
+    }
+  }
+
+  // ============================================================
+  // MARK ALL NOTIFICATIONS AS READ
+  // ============================================================
+
+  function markAllNotificationsAsRead() {
+    const user = auth.currentUser;
+
+    if (
+      !user ||
+      notifications.length === 0
+    ) {
+      return;
+    }
+
+    const allIds = notifications.map(
+      (notification) =>
+        notification.id
+    );
+
+    setReadNotificationIds(allIds);
+
+    try {
+      localStorage.setItem(
+        `campus-vibe-read-notifications-${user.uid}`,
+        JSON.stringify(allIds)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save notification read state:",
+        error
+      );
+    }
+  }
+
+  // ============================================================
+  // NOTIFICATION ICON
+  // ============================================================
+
+  function getNotificationIcon(
+    type: string
+  ) {
+    if (type === "event") {
+      return "🎉";
+    }
+
+    if (type === "reminder") {
+      return "⏰";
+    }
+
+    if (type === "announcement") {
+      return "📢";
+    }
+
+    if (type === "like") {
+      return "❤️";
+    }
+
+    if (type === "comment") {
+      return "💬";
+    }
+
+    if (type === "poll") {
+      return "🗳️";
+    }
+
+    return "🔔";
+  }
+
+  // ============================================================
+  // LOGOUT
+  // ============================================================
+
+  async function handleLogout() {
+    try {
+      await signOut(auth);
+
+      setIsLoggedIn(false);
+      setIsAdmin(false);
+      setUserEmail("");
+      setNotifications([]);
+      setReadNotificationIds([]);
+      setShowNotifications(false);
+      setMobileMenuOpen(false);
+
+      router.push("/");
+    } catch (error) {
+      console.error(
+        "Logout failed:",
+        error
+      );
+    }
+  }
+
+  // ============================================================
+  // CLOSE MOBILE MENU
+  // ============================================================
+
+  function closeMobileMenu() {
+    setMobileMenuOpen(false);
+  }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#050505] text-white">
-      {/* =========================================
-          NAVBAR
-      ========================================== */}
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
-          <a href="/" className="flex min-w-0 items-center">
-            <img
-              src="/suh.jpg"
-              alt="Sreenidhi University"
-              className="h-10 w-auto rounded-lg object-contain sm:h-12 md:h-14"
-            />
-          </a>
+    <main className="min-h-screen overflow-hidden bg-[#08080d] text-white">
 
-          <div className="hidden items-center gap-6 md:flex lg:gap-8">
-            <a
-              href="#events"
-              className="text-sm font-semibold text-white/70 transition hover:text-white"
+      {/* ========================================================
+          DESKTOP / MOBILE NAVBAR
+      ======================================================== */}
+
+      <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#08080d]/75 backdrop-blur-xl">
+
+        <div className="mx-auto max-w-7xl px-5 md:px-8">
+
+          {/* TOP ROW */}
+
+          <div className="flex min-h-[72px] items-center justify-between">
+
+            {/* BRAND */}
+
+            <button
+              onClick={() => {
+                router.push("/");
+                closeMobileMenu();
+              }}
+              className="text-left"
             >
-              Events
-            </a>
+              <h1 className="text-xl font-black tracking-tight">
+                SREENIDHI
+                <span className="text-fuchsia-400">
+                  .
+                </span>
+              </h1>
 
-            <a
-              href="#clubs"
-              className="text-sm font-semibold text-white/70 transition hover:text-white"
-            >
-              Clubs
-            </a>
+              <p className="text-[9px] font-bold tracking-[0.35em] text-white/40">
+                CAMPUS VIBE
+              </p>
+            </button>
 
-            <a
-              href="#about"
-              className="text-sm font-semibold text-white/70 transition hover:text-white"
-            >
-              About
-            </a>
+            {/* DESKTOP NAV */}
 
-            {isLoggedIn && (
-              <button
-                onClick={() => setShowNotifications(true)}
-                className="relative rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold transition hover:bg-white/10"
-              >
-                🔔 Notifications
+            <div className="hidden items-center gap-4 md:flex">
 
-                {notifications.length > 0 && (
-                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black text-white">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {isLoggedIn && (
-              <div className="flex items-center gap-2">
-                <a
-                  href="/admin"
-                  className="rounded-full bg-white px-4 py-2 text-sm font-black text-black transition hover:bg-fuchsia-400"
-                >
-                  Admin
-                </a>
-
-                <button
-                  onClick={handleLogout}
-                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-
-            {!isLoggedIn && (
-              <a
-                href="/auth"
-                className="rounded-full bg-white px-4 py-2 text-sm font-black text-black transition hover:bg-fuchsia-400"
-              >
-                Login
-              </a>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 md:hidden">
-            {isLoggedIn && (
-              <button
-                onClick={() => setShowNotifications(true)}
-                aria-label="Open notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg transition active:scale-95"
-              >
-                🔔
-
-                {notifications.length > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {!isLoggedIn && (
-              <a
-                href="/auth"
-                className="rounded-full bg-white px-4 py-2 text-sm font-black text-black transition active:scale-95"
-              >
-                Login
-              </a>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* =========================================
-          HERO
-      ========================================== */}
-      <section className="relative overflow-hidden">
-        <div className="absolute left-1/2 top-0 h-[300px] w-[300px] -translate-x-1/2 rounded-full bg-fuchsia-600/20 blur-[100px] sm:h-[400px] sm:w-[400px] md:h-[500px] md:w-[500px] md:blur-[140px]" />
-
-        <div className="relative mx-auto max-w-7xl px-5 pb-20 pt-16 sm:pb-24 sm:pt-20 md:px-5 md:pb-32 md:pt-32">
-          <div className="max-w-4xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-fuchsia-300 sm:mb-6 sm:px-4 sm:text-xs sm:tracking-widest">
-              ⚡ Sreenidhi University
-            </div>
-
-            <h1 className="text-[3.3rem] font-black leading-[0.9] tracking-[-0.05em] sm:text-6xl md:text-8xl">
-              YOUR CAMPUS.
-              <br />
-              <span className="text-fuchsia-400">YOUR VIBE.</span>
-            </h1>
-
-            <p className="mt-7 max-w-2xl text-base leading-7 text-white/60 sm:mt-8 sm:text-lg sm:leading-8 md:text-xl">
-              Discover events, clubs, competitions, workshops and everything
-              happening around campus — all in one place.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:gap-4">
               <a
                 href="#events"
-                className="flex min-h-12 items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-black text-black transition hover:scale-105 hover:bg-fuchsia-400 active:scale-95 sm:min-h-0 sm:py-4"
+                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
               >
-                Explore Events →
+                Events
+              </a>
+
+              <a
+                href="#clubs"
+                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
+              >
+                Clubs
               </a>
 
               <a
                 href="#about"
-                className="flex min-h-12 items-center justify-center rounded-full border border-white/15 bg-white/5 px-7 py-3 text-sm font-black transition hover:bg-white/10 active:scale-95 sm:min-h-0 sm:py-4"
+                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
               >
-                About Campus Vibe
+                About
               </a>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* =========================================
-          LIVE BAR
-      ========================================== */}
-      <section className="border-y border-white/10 bg-white/[0.03]">
-        <div className="mx-auto flex max-w-7xl flex-col items-start gap-2 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-green-400" />
-            </span>
-
-            <span className="text-xs font-black uppercase tracking-[0.18em] text-white/70 sm:text-sm sm:tracking-widest">
-              Campus is live
-            </span>
-          </div>
-
-          <span className="text-xs font-semibold text-white/40 sm:text-sm">
-            {loadingEvents
-              ? "Loading events..."
-              : eventsError
-                ? "Events unavailable"
-                : `${events.length} upcoming event${
-                    events.length === 1 ? "" : "s"
-                  }`}
-          </span>
-        </div>
-      </section>
-
-      {/* =========================================
-          EVENTS
-      ========================================== */}
-      <section
-        id="events"
-        className="mx-auto max-w-7xl px-5 py-16 sm:py-20 md:py-24"
-      >
-        <div className="mb-9 flex flex-col justify-between gap-5 sm:mb-12 md:flex-row md:items-end">
-          <div>
-            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.25em] text-fuchsia-400 sm:text-xs sm:tracking-[0.3em]">
-              What&apos;s happening
-            </p>
-
-            <h2 className="text-4xl font-black tracking-[-0.03em] sm:text-5xl md:text-6xl">
-              UPCOMING EVENTS
-            </h2>
-          </div>
-
-          <p className="max-w-md text-sm leading-6 text-white/50">
-            Find something you love, meet people, and make your campus life
-            memorable.
-          </p>
-        </div>
-
-        {/* LOADING */}
-        {loadingEvents && (
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-10 text-center sm:p-14">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/10 border-t-fuchsia-400 text-xl animate-spin">
-              ⚡
-            </div>
-
-            <h3 className="mt-6 text-xl font-black">
-              Loading campus events...
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-white/40">
-              Give us a second while we fetch the latest events.
-            </p>
-          </div>
-        )}
-
-        {/* ERROR */}
-        {!loadingEvents && eventsError && (
-          <div className="rounded-3xl border border-red-400/20 bg-red-400/[0.05] p-10 text-center sm:p-14">
-            <div className="text-5xl">⚠️</div>
-
-            <h3 className="mt-5 text-xl font-black">
-              Couldn&apos;t load events
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/40">
-              Something went wrong while connecting to Campus Vibe. Please try
-              again.
-            </p>
-
-            <button
-              onClick={() => setEventsRetry((value) => value + 1)}
-              className="mt-6 rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:bg-fuchsia-400 active:scale-95"
-            >
-              Try Again ↻
-            </button>
-          </div>
-        )}
-
-        {/* EMPTY */}
-        {!loadingEvents && !eventsError && events.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center sm:p-12">
-            <div className="text-4xl">📅</div>
-
-            <h3 className="mt-5 text-xl font-black">
-              No events published yet
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-white/50">
-              Check back soon. Something exciting is probably coming.
-            </p>
-          </div>
-        )}
-
-        {/* EVENTS */}
-        {!loadingEvents && !eventsError && events.length > 0 && (
-          <div className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => (
-              <article
-                key={event.id}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-5 transition duration-300 hover:-translate-y-2 hover:border-fuchsia-400/40 hover:bg-white/[0.06] sm:p-6"
-              >
-                <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-fuchsia-500/10 blur-3xl transition group-hover:bg-fuchsia-500/20" />
-
-                <div className="relative">
-                  <div className="mb-5 flex items-start justify-between gap-3 sm:mb-6">
-                    <span className="max-w-[55%] rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-fuchsia-300 sm:text-[10px]">
-                      {event.category || "Event"}
-                    </span>
-
-                    <span className="text-right text-[11px] font-bold text-white/40 sm:text-xs">
-                      {formatDate(event.date)}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-black leading-tight transition group-hover:text-fuchsia-300 sm:text-2xl">
-                    {event.title}
-                  </h3>
-
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/50 sm:mt-4">
-                    {event.description}
-                  </p>
-
-                  <div className="mt-5 space-y-2 text-sm text-white/60 sm:mt-6">
-                    <div className="flex items-start gap-2">
-                      <span>🕒</span>
-                      <span>{event.time || "Time TBA"}</span>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <span>📍</span>
-                      <span>{event.venue || "Venue TBA"}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-7 flex items-center justify-between sm:mt-8">
-                    <a
-                      href={`/events/${event.id}`}
-                      className="inline-flex min-h-10 items-center text-sm font-black transition group-hover:text-fuchsia-400"
-                    >
-                      View Event →
-                    </a>
-
-                    <span className="text-lg transition group-hover:translate-x-1">
-                      ↗
-                    </span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* =========================================
-          CLUBS
-      ========================================== */}
-      <section
-        id="clubs"
-        className="border-y border-white/10 bg-white/[0.025]"
-      >
-        <div className="mx-auto max-w-7xl px-5 py-16 sm:py-20 md:py-24">
-          <div className="mb-9 sm:mb-12">
-            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.25em] text-fuchsia-400 sm:text-xs sm:tracking-[0.3em]">
-              Find your people
-            </p>
-
-            <h2 className="text-4xl font-black tracking-[-0.03em] sm:text-5xl md:text-6xl">
-              CAMPUS CLUBS
-            </h2>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-            {[
-              ["💻", "TECH", "Build. Code. Create."],
-              ["🎨", "CREATIVE", "Design. Create. Express."],
-              ["🎤", "CULTURAL", "Perform. Celebrate. Connect."],
-              ["🏆", "SPORTS", "Compete. Train. Win."],
-            ].map(([emoji, title, text]) => (
-              <div
-                key={title}
-                className="rounded-3xl border border-white/10 bg-black/30 p-6 transition hover:-translate-y-1 hover:border-white/20 sm:p-7"
-              >
-                <div className="text-4xl">{emoji}</div>
-
-                <h3 className="mt-5 text-xl font-black sm:mt-6">{title}</h3>
-
-                <p className="mt-2 text-sm text-white/45">{text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================
-          ABOUT
-      ========================================== */}
-      <section
-        id="about"
-        className="mx-auto max-w-7xl px-5 py-16 sm:py-20 md:py-24"
-      >
-        <div className="grid gap-10 sm:gap-12 md:grid-cols-2 md:items-center">
-          <div>
-            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.25em] text-fuchsia-400 sm:text-xs sm:tracking-[0.3em]">
-              About Campus Vibe
-            </p>
-
-            <h2 className="text-4xl font-black tracking-[-0.03em] sm:text-5xl md:text-6xl">
-              COLLEGE HAPPENS
-              <br />
-              <span className="text-fuchsia-400">
-                BEYOND THE CLASSROOM.
-              </span>
-            </h2>
-          </div>
-
-          <div className="space-y-6 text-sm leading-7 text-white/55 sm:text-base sm:leading-8">
-            <p>
-              Campus Vibe brings Sreenidhi University events into one place.
-              From technical fests and workshops to cultural programs,
-              competitions and club activities, students can discover what is
-              happening around campus.
-            </p>
-
-            <p>
-              The goal is simple: make campus life easier to discover, more
-              connected, and more exciting.
-            </p>
-
-            <div className="border-l-2 border-fuchsia-400 pl-4 sm:pl-5">
-              <p className="font-black text-white">
-                BUILT BY K. SUHAAS KASHYAP
-              </p>
-
-              <p className="text-sm text-white/40">
-                First Year · Sreenidhi University
-              </p>
-            </div>
-
-            <p className="font-black text-white">
-              Your campus. Your people. Your vibe. ⚡
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================
-          FOOTER
-      ========================================== */}
-      <footer className="border-t border-white/10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 sm:gap-4 sm:py-10 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-black">CAMPUS VIBE ⚡</p>
-
-            <p className="mt-1 text-xs text-white/35">
-              Sreenidhi University
-            </p>
-          </div>
-
-          <p className="text-xs text-white/30">
-            Built for campus. Built by students.
-          </p>
-        </div>
-      </footer>
-
-      {/* =========================================
-          NOTIFICATIONS POPUP
-      ========================================== */}
-      {showNotifications && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 px-0 backdrop-blur-sm sm:items-center sm:px-5"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowNotifications(false);
-            }
-          }}
-        >
-          <div className="max-h-[88vh] w-full overflow-hidden rounded-t-3xl border border-white/10 bg-[#101010] shadow-2xl sm:max-h-[80vh] sm:max-w-lg sm:rounded-3xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6 sm:py-5">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-fuchsia-400 sm:text-xs sm:tracking-[0.25em]">
-                  Campus updates
-                </p>
-
-                <h2 className="mt-1 text-xl font-black sm:text-2xl">
-                  Notifications
-                </h2>
-              </div>
+              {/* COMMUNITY */}
 
               <button
-                onClick={() => setShowNotifications(false)}
-                aria-label="Close notifications"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg transition hover:bg-white/10 active:scale-95"
+                onClick={() =>
+                  router.push(
+                    "/community"
+                  )
+                }
+                className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-bold text-cyan-300 transition hover:scale-105 hover:bg-cyan-400/20"
+              >
+                👥 Community
+              </button>
+
+              {/* ADMIN */}
+
+              {isAdmin && (
+                <button
+                  onClick={() =>
+                    router.push(
+                      "/admin"
+                    )
+                  }
+                  className="rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2 text-sm font-bold text-fuchsia-300 transition hover:bg-fuchsia-500/20"
+                >
+                  🛠️ Admin
+                </button>
+              )}
+
+              {/* NOTIFICATIONS */}
+
+              {isLoggedIn && (
+                <button
+                  onClick={() =>
+                    setShowNotifications(
+                      !showNotifications
+                    )
+                  }
+                  className="relative rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"
+                >
+                  🔔 Notifications
+
+                  {unreadNotifications.length >
+                    0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black">
+                      {unreadNotifications.length >
+                      9
+                        ? "9+"
+                        : unreadNotifications.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* LOGIN / LOGOUT */}
+
+              {isLoggedIn ? (
+                <button
+                  onClick={handleLogout}
+                  className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:scale-105"
+                >
+                  Logout
+                </button>
+              ) : (
+                <button
+                  onClick={() =>
+                    router.push(
+                      "/auth"
+                    )
+                  }
+                  className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:scale-105"
+                >
+                  Login
+                </button>
+              )}
+
+            </div>
+
+            {/* MOBILE BUTTONS */}
+
+            <div className="flex items-center gap-2 md:hidden">
+
+              {isLoggedIn && (
+                <button
+                  onClick={() =>
+                    setShowNotifications(
+                      !showNotifications
+                    )
+                  }
+                  className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5"
+                >
+                  🔔
+
+                  {unreadNotifications.length >
+                    0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black">
+                      {unreadNotifications.length >
+                      9
+                        ? "9+"
+                        : unreadNotifications.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={() =>
+                  setMobileMenuOpen(
+                    !mobileMenuOpen
+                  )
+                }
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl"
+              >
+                {mobileMenuOpen
+                  ? "✕"
+                  : "☰"}
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* MOBILE MENU */}
+
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                height: 0,
+              }}
+              animate={{
+                opacity: 1,
+                height: "auto",
+              }}
+              exit={{
+                opacity: 0,
+                height: 0,
+              }}
+              className="border-t border-white/10 py-4 md:hidden"
+            >
+
+              <div className="grid gap-2">
+
+                <a
+                  href="#events"
+                  onClick={
+                    closeMobileMenu
+                  }
+                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                >
+                  🎉 Events
+                </a>
+
+                <a
+                  href="#clubs"
+                  onClick={
+                    closeMobileMenu
+                  }
+                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                >
+                  👥 Clubs
+                </a>
+
+                <a
+                  href="#about"
+                  onClick={
+                    closeMobileMenu
+                  }
+                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                >
+                  ℹ️ About
+                </a>
+
+                {/* COMMUNITY MOBILE */}
+
+                <button
+                  onClick={() => {
+                    closeMobileMenu();
+                    router.push(
+                      "/community"
+                    );
+                  }}
+                  className="flex min-h-12 items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 text-left font-bold text-cyan-300"
+                >
+                  👥 Community
+                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      closeMobileMenu();
+                      router.push(
+                        "/admin"
+                      );
+                    }}
+                    className="flex min-h-12 items-center rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 text-left font-bold text-fuchsia-300"
+                  >
+                    🛠️ Admin Dashboard
+                  </button>
+                )}
+
+                {isLoggedIn ? (
+                  <button
+                    onClick={
+                      handleLogout
+                    }
+                    className="flex min-h-12 items-center rounded-xl bg-white px-4 text-left font-black text-black"
+                  >
+                    🚪 Logout
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      closeMobileMenu();
+                      router.push(
+                        "/auth"
+                      );
+                    }}
+                    className="flex min-h-12 items-center rounded-xl bg-white px-4 text-left font-black text-black"
+                  >
+                    🔐 Login
+                  </button>
+                )}
+
+              </div>
+
+              {isLoggedIn &&
+                userEmail && (
+                  <p className="mt-4 px-2 text-xs text-white/30">
+                    Signed in as{" "}
+                    {userEmail}
+                  </p>
+                )}
+
+            </motion.div>
+          )}
+
+        </div>
+
+      </nav>
+
+      {/* ========================================================
+          NOTIFICATIONS POPUP
+      ======================================================== */}
+
+      {showNotifications && (
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: -15,
+            scale: 0.97,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            scale: 1,
+          }}
+          className="fixed right-4 top-20 z-[70] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-white/10 bg-[#15151d]/95 p-5 shadow-2xl backdrop-blur-xl md:right-8"
+        >
+
+          <div className="flex items-start justify-between">
+
+            <div>
+              <p className="font-bold">
+                🔔 Notifications
+              </p>
+
+              {notifications.length >
+                0 && (
+                <p className="mt-1 text-xs text-white/30">
+                  {unreadNotifications.length >
+                  0
+                    ? `${unreadNotifications.length} unread`
+                    : "All caught up"}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+
+              {unreadNotifications.length >
+                0 && (
+                <button
+                  onClick={
+                    markAllNotificationsAsRead
+                  }
+                  className="text-[10px] font-black uppercase tracking-wider text-cyan-400 transition hover:text-cyan-300"
+                >
+                  Mark all read
+                </button>
+              )}
+
+              <button
+                onClick={() =>
+                  setShowNotifications(
+                    false
+                  )
+                }
+                className="text-white/40 hover:text-white"
               >
                 ✕
               </button>
+
             </div>
 
-            <div className="max-h-[70vh] overflow-y-auto p-4 sm:max-h-[60vh] sm:p-5">
-              {!isLoggedIn ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center sm:p-8">
-                  <div className="text-4xl">🔐</div>
+          </div>
 
-                  <h3 className="mt-4 font-black">
-                    Login to see notifications
-                  </h3>
+          {loadingNotifications ? (
+            <div className="py-10 text-center">
 
-                  <p className="mt-2 text-sm leading-6 text-white/40">
-                    Sign in to receive campus updates.
-                  </p>
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center sm:p-8">
-                  <div className="text-4xl">✨</div>
+              <div className="text-3xl">
+                ⚡
+              </div>
 
-                  <h3 className="mt-4 font-black">
-                    You&apos;re all caught up
-                  </h3>
+              <p className="mt-3 text-sm text-white/40">
+                Loading notifications...
+              </p>
 
-                  <p className="mt-2 text-sm leading-6 text-white/40">
-                    No new campus notifications right now.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5"
+            </div>
+          ) : notifications.length ===
+            0 ? (
+            <div className="py-10 text-center">
+
+              <div className="text-4xl">
+                🎉
+              </div>
+
+              <p className="mt-3 font-bold">
+                You're all caught up!
+              </p>
+
+              <p className="mt-2 text-sm text-white/40">
+                New campus announcements
+                will appear here.
+              </p>
+
+            </div>
+          ) : (
+            <div className="mt-5 max-h-[420px] space-y-3 overflow-y-auto">
+
+              {notifications.map(
+                (notification) => {
+                  const isRead =
+                    isNotificationRead(
+                      notification
+                    );
+
+                  return (
+                    <button
+                      key={
+                        notification.id
+                      }
+                      onClick={() =>
+                        markNotificationAsRead(
+                          notification.id
+                        )
+                      }
+                      className={`w-full rounded-2xl border p-4 text-left transition ${
+                        isRead
+                          ? "border-white/10 bg-white/[0.02]"
+                          : "border-fuchsia-400/20 bg-fuchsia-500/[0.06] hover:bg-fuchsia-500/[0.1]"
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-fuchsia-400 sm:text-[10px]">
-                            {notification.type || "Update"}
-                          </span>
 
-                          <h3 className="mt-2 break-words text-base font-black sm:text-lg">
-                            {notification.title}
-                          </h3>
+                      <div className="flex gap-3">
+
+                        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
+
+                          {getNotificationIcon(
+                            notification.type
+                          )}
+
+                          {!isRead && (
+                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-fuchsia-400" />
+                          )}
+
                         </div>
 
-                        <span className="shrink-0 text-lg">🔔</span>
+                        <div className="min-w-0">
+
+                          <div className="flex items-start justify-between gap-3">
+
+                            <p className="font-bold">
+                              {
+                                notification.title
+                              }
+                            </p>
+
+                            {!isRead && (
+                              <span className="mt-1 shrink-0 text-[9px] font-black uppercase tracking-wider text-fuchsia-400">
+                                New
+                              </span>
+                            )}
+
+                          </div>
+
+                          <p className="mt-1 text-sm leading-6 text-white/45">
+                            {
+                              notification.message
+                            }
+                          </p>
+
+                          {notification.createdAt && (
+                            <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-white/20">
+                              {notification
+                                .createdAt
+                                ?.toDate
+                                ? notification.createdAt
+                                    .toDate()
+                                    .toLocaleString()
+                                : ""}
+                            </p>
+                          )}
+
+                        </div>
+
                       </div>
 
-                      <p className="mt-3 break-words text-sm leading-6 text-white/50">
-                        {notification.message}
+                    </button>
+                  );
+                }
+              )}
+
+            </div>
+          )}
+
+        </motion.div>
+      )}
+
+      {/* ========================================================
+          HERO
+      ======================================================== */}
+
+      <motion.section
+        initial="hidden"
+        animate="visible"
+        variants={stagger}
+        className="relative flex min-h-screen items-center px-6 pt-28 md:px-12"
+      >
+
+        <div className="absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-fuchsia-600/20 blur-[120px]" />
+
+        <div className="absolute right-0 top-20 h-80 w-80 rounded-full bg-cyan-500/10 blur-[120px]" />
+
+        <div className="relative mx-auto w-full max-w-7xl">
+
+          <motion.div
+            variants={fadeUp}
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/70 backdrop-blur"
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
+            CAMPUS IS ALIVE
+          </motion.div>
+
+          <motion.h2
+            variants={fadeUp}
+            className="max-w-5xl text-6xl font-black leading-[0.9] tracking-[-0.06em] sm:text-7xl md:text-9xl"
+          >
+            YOUR CAMPUS.
+            <br />
+
+            <span className="bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              YOUR VIBE.
+            </span>
+          </motion.h2>
+
+          <motion.p
+            variants={fadeUp}
+            className="mt-8 max-w-2xl text-lg leading-relaxed text-white/50 md:text-xl"
+          >
+            Discover everything happening at
+            Sreenidhi University — events,
+            clubs, competitions, concerts,
+            workshops and moments you don't
+            want to miss.
+          </motion.p>
+
+          <motion.div
+            variants={fadeUp}
+            className="mt-10 flex flex-wrap gap-4"
+          >
+
+            <a
+              href="#events"
+              className="rounded-full bg-white px-7 py-4 text-sm font-black text-black transition hover:scale-105"
+            >
+              Explore Events →
+            </a>
+
+            <button
+              onClick={() =>
+                router.push(
+                  "/community"
+                )
+              }
+              className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-7 py-4 text-sm font-bold text-cyan-300 backdrop-blur transition hover:scale-105 hover:bg-cyan-400/20"
+            >
+              👥 Community →
+            </button>
+
+            <button
+              onClick={() =>
+                setShowNotifications(
+                  true
+                )
+              }
+              className="rounded-full border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold backdrop-blur transition hover:bg-white/10"
+            >
+              ✨ What's happening?
+            </button>
+
+          </motion.div>
+
+          <motion.div
+            variants={fadeUp}
+            className="mt-16 grid max-w-3xl grid-cols-3 gap-4 border-t border-white/10 pt-8"
+          >
+
+            <div>
+              <p className="text-3xl font-black">
+                {events.length}
+              </p>
+
+              <p className="mt-1 text-xs text-white/40">
+                Upcoming events
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl font-black">
+                10
+              </p>
+
+              <p className="mt-1 text-xs text-white/40">
+                Active clubs
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl font-black">
+                2.4K+
+              </p>
+
+              <p className="mt-1 text-xs text-white/40">
+                Students vibing
+              </p>
+            </div>
+
+          </motion.div>
+
+        </div>
+
+      </motion.section>
+
+      {/* ========================================================
+          LIVE
+      ======================================================== */}
+
+      <section className="border-y border-white/10 bg-white/[0.02] px-6 py-8 md:px-12">
+
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 md:flex-row md:items-center">
+
+          <div>
+
+            <div className="mb-2 flex items-center gap-2 text-xs font-black tracking-widest text-red-400">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              LIVE ON CAMPUS
+            </div>
+
+            <h3 className="text-2xl font-black">
+              Something is happening right now.
+            </h3>
+
+          </div>
+
+          <a
+            href="#events"
+            className="rounded-full border border-white/10 px-6 py-3 text-sm font-bold transition hover:bg-white/10"
+          >
+            See Live Events →
+          </a>
+
+        </div>
+
+      </section>
+
+      {/* ========================================================
+          EVENTS
+      ======================================================== */}
+
+      <section
+        id="events"
+        className="px-6 py-24 md:px-12"
+      >
+
+        <div className="mx-auto max-w-7xl">
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{
+              once: true,
+              amount: 0.2,
+            }}
+            variants={fadeUp}
+            className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"
+          >
+
+            <div>
+
+              <p className="mb-3 text-sm font-black tracking-[0.25em] text-fuchsia-400">
+                DON'T MISS OUT
+              </p>
+
+              <h3 className="text-5xl font-black tracking-tight md:text-6xl">
+                Upcoming events.
+              </h3>
+
+            </div>
+
+          </motion.div>
+
+          {loadingEvents && (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center">
+
+              <div className="text-4xl">
+                ⚡
+              </div>
+
+              <p className="mt-4 text-white/40">
+                Loading campus events...
+              </p>
+
+            </div>
+          )}
+
+          {!loadingEvents &&
+            events.length === 0 && (
+              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center">
+
+                <div className="text-5xl">
+                  📅
+                </div>
+
+                <h4 className="mt-5 text-2xl font-black">
+                  Nothing scheduled yet
+                </h4>
+
+                <p className="mt-2 text-white/40">
+                  New campus events will appear
+                  here soon.
+                </p>
+
+              </div>
+            )}
+
+          {!loadingEvents &&
+            events.length > 0 && (
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{
+                  once: true,
+                  amount: 0.1,
+                }}
+                variants={stagger}
+                className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+              >
+
+                {events.map((event) => (
+                  <motion.article
+                    key={event.id}
+                    variants={fadeUp}
+                    whileHover={{
+                      y: -8,
+                    }}
+                    className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-500 hover:border-white/20 hover:bg-white/[0.07]"
+                  >
+
+                    {event.imageUrl ? (
+                      <div className="relative h-56 overflow-hidden">
+
+                        <img
+                          src={event.imageUrl}
+                          alt={event.title}
+                          className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                        />
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                        <span className="absolute left-5 top-5 rounded-full bg-black/50 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
+                          {event.category}
+                        </span>
+
+                      </div>
+                    ) : (
+                      <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20">
+
+                        <div className="absolute h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
+
+                        <span className="relative text-7xl transition duration-500 group-hover:scale-125">
+                          {event.category ===
+                          "Technical"
+                            ? "💻"
+                            : event.category ===
+                                "Cultural"
+                              ? "🎨"
+                              : event.category ===
+                                  "Sports"
+                                ? "🏆"
+                                : event.category ===
+                                    "Workshop"
+                                  ? "🛠️"
+                                  : event.category ===
+                                      "Competition"
+                                    ? "⚡"
+                                    : event.category ===
+                                        "Club"
+                                      ? "👥"
+                                      : "🎉"}
+                        </span>
+
+                        <span className="absolute left-5 top-5 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
+                          {event.category}
+                        </span>
+
+                      </div>
+                    )}
+
+                    <div className="p-6">
+
+                      <p className="text-xs font-bold text-fuchsia-400">
+                        {event.date} ·{" "}
+                        {event.time}
                       </p>
 
-                      {notification.createdAt && (
-                        <p className="mt-4 text-[10px] font-semibold text-white/25 sm:text-[11px]">
-                          {notification.createdAt
-                            .toDate()
-                            .toLocaleString("en-IN")}
-                        </p>
-                      )}
+                      <h4 className="mt-3 text-2xl font-black">
+                        {event.title}
+                      </h4>
+
+                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/40">
+                        {event.description}
+                      </p>
+
+                      <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
+
+                        <span className="text-xs text-white/40">
+                          📍 {event.venue}
+                        </span>
+
+                        <a
+                          href={`/events/${event.id}`}
+                          className="text-sm font-black transition group-hover:text-fuchsia-400"
+                        >
+                          View Event →
+                        </a>
+
+                      </div>
+
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+
+                  </motion.article>
+                ))}
+
+              </motion.div>
+            )}
+
         </div>
-      )}
+
+      </section>
+
+      {/* ========================================================
+          CLUBS
+      ======================================================== */}
+
+      <section
+        id="clubs"
+        className="px-6 pb-24 md:px-12"
+      >
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{
+            once: true,
+            amount: 0.2,
+          }}
+          variants={fadeUp}
+          className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-cyan-500/5 p-8 md:p-16"
+        >
+
+          <p className="text-sm font-black tracking-[0.25em] text-cyan-400">
+            FIND YOUR PEOPLE
+          </p>
+
+          <div className="mt-4 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+
+            <h3 className="max-w-2xl text-5xl font-black tracking-tight md:text-6xl">
+              Clubs, communities & chaos.
+            </h3>
+
+            <button className="w-fit rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:scale-105">
+              Explore Clubs →
+            </button>
+
+          </div>
+
+          <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+
+            {[
+              "💻 Coding",
+              "🎸 Music",
+              "🎨 Arts",
+              "🏆 Sports",
+            ].map((club) => (
+              <motion.div
+                key={club}
+                whileHover={{
+                  y: -5,
+                  scale: 1.02,
+                }}
+                className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm font-bold transition hover:bg-white/10"
+              >
+                {club}
+              </motion.div>
+            ))}
+
+          </div>
+
+        </motion.div>
+
+      </section>
+
+      {/* ========================================================
+          ABOUT
+      ======================================================== */}
+
+      <section
+        id="about"
+        className="px-6 pb-24 md:px-12"
+      >
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{
+            once: true,
+            amount: 0.2,
+          }}
+          variants={fadeUp}
+          className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 p-8 md:p-16"
+        >
+
+          <div className="grid gap-12 md:grid-cols-[1.4fr_0.8fr] md:items-center">
+
+            <div>
+
+              <p className="text-sm font-black tracking-[0.25em] text-fuchsia-400">
+                ABOUT CAMPUS VIBE
+              </p>
+
+              <h3 className="mt-4 max-w-3xl text-5xl font-black tracking-tight md:text-6xl">
+                College happens beyond the classroom.
+              </h3>
+
+              <p className="mt-6 max-w-3xl text-lg leading-relaxed text-white/50">
+                Campus Vibe is built to bring
+                the energy of Sreenidhi University
+                events into one place. From technical
+                competitions and workshops to cultural
+                celebrations, sports, club activities
+                and everything in between, Campus Vibe
+                makes it easier for students to discover
+                what's happening around campus and be
+                part of it.
+              </p>
+
+              <p className="mt-5 max-w-3xl text-lg leading-relaxed text-white/50">
+                No more missing an event because you
+                heard about it too late. Find what's
+                happening, check the details, register,
+                and show up.
+              </p>
+
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-7 md:p-8">
+
+              <p className="text-xs font-black tracking-[0.25em] text-cyan-400">
+                BUILT BY
+              </p>
+
+              <h4 className="mt-4 text-3xl font-black">
+                K. Suhaas Kashyap
+              </h4>
+
+              <p className="mt-2 text-white/40">
+                First Year · Sreenidhi University
+              </p>
+
+              <div className="my-7 h-px bg-white/10" />
+
+              <p className="text-sm leading-7 text-white/50">
+                Created with the idea that college
+                isn't just about classrooms and
+                assignments — it's about the people
+                you meet, the communities you join,
+                the events you experience, and the
+                memories you make along the way.
+              </p>
+
+              <p className="mt-6 text-lg font-black text-white">
+                Your campus.
+                <br />
+                Your people.
+                <br />
+                Your vibe.
+                <span className="ml-2 text-fuchsia-400">
+                  ⚡
+                </span>
+              </p>
+
+            </div>
+
+          </div>
+
+        </motion.div>
+
+      </section>
+
+      {/* ========================================================
+          FOOTER
+      ======================================================== */}
+
+      <footer className="border-t border-white/10 px-6 py-10 md:px-12">
+
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 text-sm text-white/40 md:flex-row">
+
+          <p>
+            © 2026 Sreenidhi University Campus Vibe
+          </p>
+
+          <p>
+            Built for the students. ⚡
+          </p>
+
+        </div>
+
+      </footer>
+
     </main>
   );
 }

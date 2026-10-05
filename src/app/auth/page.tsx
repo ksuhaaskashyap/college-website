@@ -5,12 +5,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 
 export default function AuthPage() {
-  const router = useRouter();
-
   const [mode, setMode] = useState<"login" | "signup">("login");
 
   const [email, setEmail] = useState("");
@@ -19,61 +16,73 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(
-    e: React.FormEvent
-  ) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading) return;
 
     setLoading(true);
     setError("");
 
     try {
+      const cleanEmail = email.trim();
+
       if (mode === "login") {
         await signInWithEmailAndPassword(
           auth,
-          email,
+          cleanEmail,
           password
         );
       } else {
         await createUserWithEmailAndPassword(
           auth,
-          email,
+          cleanEmail,
           password
         );
       }
 
-      // Send the user directly back to Campus Vibe
-      router.push("/");
+      /*
+       * Use a full browser navigation instead of router.push().
+       * This makes sure the newly-created Firebase auth session
+       * is picked up when the homepage loads.
+       */
+      window.location.href = "/";
 
-    } catch (error: any) {
-      console.error(error);
+    } catch (err: any) {
+      console.error("Firebase Auth Error:", err);
 
-      if (error.code === "auth/invalid-credential") {
+      const code = err?.code || "unknown";
+      const message = err?.message || "Unknown Firebase error";
+
+      console.error("Firebase error code:", code);
+      console.error("Firebase error message:", message);
+
+      if (code === "auth/invalid-credential") {
+        setError("Incorrect email or password.");
+      } else if (code === "auth/user-not-found") {
+        setError("No account exists with this email.");
+      } else if (code === "auth/wrong-password") {
+        setError("Incorrect password.");
+      } else if (code === "auth/email-already-in-use") {
+        setError("An account with this email already exists.");
+      } else if (code === "auth/weak-password") {
+        setError("Password should be at least 6 characters.");
+      } else if (code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (code === "auth/operation-not-allowed") {
         setError(
-          "Incorrect email or password."
+          "Email/password login is not enabled in Firebase."
         );
-      } else if (
-        error.code === "auth/email-already-in-use"
-      ) {
+      } else if (code === "auth/network-request-failed") {
         setError(
-          "An account with this email already exists."
-        );
-      } else if (
-        error.code === "auth/weak-password"
-      ) {
-        setError(
-          "Password should be at least 6 characters."
-        );
-      } else if (
-        error.code === "auth/invalid-email"
-      ) {
-        setError(
-          "Please enter a valid email address."
+          "Network error. Check your phone's internet connection."
         );
       } else {
-        setError(
-          "Something went wrong. Please try again."
-        );
+        /*
+         * TEMPORARY diagnostic message.
+         * This lets us see the exact Firebase error on mobile.
+         */
+        setError(`${code}: ${message}`);
       }
 
       setLoading(false);
@@ -82,13 +91,10 @@ export default function AuthPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#08080d] px-6 text-white">
-
       <div className="w-full max-w-md">
 
         {/* BRAND */}
-
         <div className="mb-10 text-center">
-
           <p className="text-xs font-black tracking-[0.3em] text-fuchsia-400">
             SREENIDHI
           </p>
@@ -100,16 +106,12 @@ export default function AuthPage() {
           <p className="mt-3 text-white/40">
             Join the campus. Find your vibe.
           </p>
-
         </div>
 
-
         {/* CARD */}
-
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl">
 
           {/* TABS */}
-
           <div className="mb-8 grid grid-cols-2 rounded-xl bg-black/30 p-1">
 
             <button
@@ -144,7 +146,6 @@ export default function AuthPage() {
 
           </div>
 
-
           <h2 className="text-2xl font-black">
             {mode === "login"
               ? "Welcome back 👋"
@@ -157,16 +158,13 @@ export default function AuthPage() {
               : "Create your account and start exploring."}
           </p>
 
-
           {/* FORM */}
-
           <form
             onSubmit={handleSubmit}
             className="mt-7 space-y-5"
           >
 
             <div>
-
               <label className="text-sm font-bold text-white/70">
                 Email
               </label>
@@ -174,19 +172,15 @@ export default function AuthPage() {
               <input
                 required
                 type="email"
+                autoComplete="email"
                 value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-fuchsia-400"
               />
-
             </div>
 
-
             <div>
-
               <label className="text-sm font-bold text-white/70">
                 Password
               </label>
@@ -194,31 +188,31 @@ export default function AuthPage() {
               <input
                 required
                 type="password"
-                value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
+                autoComplete={
+                  mode === "login"
+                    ? "current-password"
+                    : "new-password"
                 }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-fuchsia-400"
               />
-
             </div>
 
-
             {error && (
-              <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+              <div className="break-words rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
                 {error}
               </div>
             )}
 
-
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-fuchsia-500 py-4 font-black text-white transition hover:scale-[1.01] disabled:opacity-50"
+              className="w-full rounded-xl bg-fuchsia-500 py-4 font-black text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
-                ? "Please wait..."
+                ? "Signing you in..."
                 : mode === "login"
                   ? "Login →"
                   : "Create Account →"}
@@ -226,9 +220,11 @@ export default function AuthPage() {
 
           </form>
 
-
           <button
-            onClick={() => router.push("/")}
+            type="button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
             className="mt-5 w-full text-center text-sm text-white/30 transition hover:text-white"
           >
             ← Back to Campus
@@ -236,13 +232,11 @@ export default function AuthPage() {
 
         </div>
 
-
         <p className="mt-6 text-center text-xs text-white/20">
           Sreenidhi University · Campus Vibe
         </p>
 
       </div>
-
     </main>
   );
 }
