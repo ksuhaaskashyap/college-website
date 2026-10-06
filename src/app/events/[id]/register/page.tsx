@@ -17,90 +17,196 @@ export default function RegisterPage() {
 
   const eventId = params.id as string;
 
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [event, setEvent] = useState<any>(null);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [user, setUser] =
+    useState<any>(null);
 
-  const [fullName, setFullName] = useState("");
-  const [department, setDepartment] = useState("");
-  const [year, setYear] = useState("");
+  const [event, setEvent] =
+    useState<any>(null);
 
-  const [registering, setRegistering] = useState(false);
-  const [message, setMessage] = useState("");
+  const [alreadyRegistered, setAlreadyRegistered] =
+    useState(false);
+
+  const [fullName, setFullName] =
+    useState("");
+
+  const [department, setDepartment] =
+    useState("");
+
+  const [year, setYear] =
+    useState("");
+
+  const [entryCode, setEntryCode] =
+    useState("");
+
+  const [entryCodeLoading, setEntryCodeLoading] =
+    useState(false);
+
+  const [registering, setRegistering] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (currentUser) => {
-        try {
-          setUser(currentUser);
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        async (currentUser) => {
+          try {
+            setUser(currentUser);
 
-          // Load event
-          const eventDoc = await getDoc(
-            doc(db, "events", eventId)
-          );
+            const eventDoc =
+              await getDoc(
+                doc(
+                  db,
+                  "events",
+                  eventId
+                )
+              );
 
-          if (!eventDoc.exists()) {
-            setMessage("This event doesn't exist.");
-            setLoading(false);
-            return;
-          }
+            if (!eventDoc.exists()) {
+              setMessage(
+                "This event doesn't exist."
+              );
 
-          const eventData = eventDoc.data();
+              setLoading(false);
+              return;
+            }
 
-          setEvent({
-            id: eventDoc.id,
-            ...eventData,
-          });
+            const eventData =
+              eventDoc.data();
 
-          // Check existing registration
-          if (currentUser) {
-            const registrationDoc = await getDoc(
-              doc(
-                db,
-                "registrations",
-                `${eventId}_${currentUser.uid}`
-              )
+            const loadedEvent: any = {
+              id: eventDoc.id,
+              ...eventData,
+            };
+
+            setEvent(loadedEvent);
+
+            if (currentUser) {
+              const registrationDoc =
+                await getDoc(
+                  doc(
+                    db,
+                    "registrations",
+                    `${eventId}_${currentUser.uid}`
+                  )
+                );
+
+              if (
+                registrationDoc.exists()
+              ) {
+                setAlreadyRegistered(
+                  true
+                );
+
+                const registration =
+                  registrationDoc.data();
+
+                setFullName(
+                  registration.fullName ||
+                    ""
+                );
+
+                setDepartment(
+                  registration.department ||
+                    ""
+                );
+
+                setYear(
+                  registration.year ||
+                    ""
+                );
+
+                if (
+                  loadedEvent.entryCodeEnabled ===
+                    true ||
+                  loadedEvent.qrEntryEnabled ===
+                    true
+                ) {
+                  await createOrGetEntryCode(
+                    currentUser
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.error(
+              "Failed to load registration:",
+              error
             );
 
-            if (registrationDoc.exists()) {
-              setAlreadyRegistered(true);
-
-              const registration =
-                registrationDoc.data();
-
-              setFullName(
-                registration.fullName || ""
-              );
-
-              setDepartment(
-                registration.department || ""
-              );
-
-              setYear(
-                registration.year || ""
-              );
-            }
+            setMessage(
+              "Couldn't load this event."
+            );
           }
-        } catch (error) {
-          console.error(
-            "Failed to load registration:",
-            error
-          );
 
-          setMessage(
-            "Couldn't load this event."
-          );
+          setLoading(false);
         }
-
-        setLoading(false);
-      }
-    );
+      );
 
     return () => unsubscribe();
   }, [eventId]);
+
+  async function createOrGetEntryCode(
+    currentUser: any
+  ) {
+    if (!currentUser) {
+      return;
+    }
+
+    setEntryCodeLoading(true);
+
+    try {
+      const idToken =
+        await currentUser.getIdToken();
+
+      const response =
+        await fetch(
+          "/api/entry-passes",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              eventId,
+              source:
+                "registration",
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Couldn't create your entry code."
+        );
+      }
+
+      setEntryCode(
+        data.entryCode || ""
+      );
+    } catch (error) {
+      console.error(
+        "Entry code creation failed:",
+        error
+      );
+
+      setEntryCode("");
+    } finally {
+      setEntryCodeLoading(false);
+    }
+  }
 
   async function registerForEvent(
     e: React.FormEvent
@@ -115,7 +221,9 @@ export default function RegisterPage() {
     }
 
     if (!fullName.trim()) {
-      setMessage("Please enter your name.");
+      setMessage(
+        "Please enter your name."
+      );
       return;
     }
 
@@ -133,34 +241,51 @@ export default function RegisterPage() {
       const registrationId =
         `${eventId}_${user.uid}`;
 
-      const registrationRef = doc(
-        db,
-        "registrations",
-        registrationId
-      );
+      const registrationRef =
+        doc(
+          db,
+          "registrations",
+          registrationId
+        );
 
-      // Check one more time immediately before writing.
-      // This protects against duplicate clicks or multiple tabs.
       const existingRegistration =
-        await getDoc(registrationRef);
+        await getDoc(
+          registrationRef
+        );
 
-      if (existingRegistration.exists()) {
+      if (
+        existingRegistration.exists()
+      ) {
         setAlreadyRegistered(true);
 
         const registration =
           existingRegistration.data();
 
         setFullName(
-          registration.fullName || ""
+          registration.fullName ||
+            ""
         );
 
         setDepartment(
-          registration.department || ""
+          registration.department ||
+            ""
         );
 
         setYear(
-          registration.year || ""
+          registration.year ||
+            ""
         );
+
+        if (
+          event.entryCodeEnabled ===
+            true ||
+          event.qrEntryEnabled ===
+            true
+        ) {
+          await createOrGetEntryCode(
+            user
+          );
+        }
 
         setMessage(
           "You are already registered for this event."
@@ -177,10 +302,12 @@ export default function RegisterPage() {
           eventTitle: event.title,
           userId: user.uid,
           email: user.email || "",
-          fullName: fullName.trim(),
+          fullName:
+            fullName.trim(),
           department,
           year,
-          registeredAt: serverTimestamp(),
+          registeredAt:
+            serverTimestamp(),
         }
       );
 
@@ -189,6 +316,17 @@ export default function RegisterPage() {
       setMessage(
         "You're registered successfully! 🎉"
       );
+
+      if (
+        event.entryCodeEnabled ===
+          true ||
+        event.qrEntryEnabled ===
+          true
+      ) {
+        await createOrGetEntryCode(
+          user
+        );
+      }
     } catch (error) {
       console.error(
         "Registration failed:",
@@ -232,7 +370,9 @@ export default function RegisterPage() {
           </h1>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push("/")
+            }
             className="mt-7 rounded-xl bg-white px-6 py-3 font-black text-black"
           >
             Back to Campus
@@ -246,7 +386,6 @@ export default function RegisterPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#08080d] px-6 text-white">
         <div className="max-w-lg text-center">
-
           <div className="text-6xl">
             🎟️
           </div>
@@ -256,41 +395,49 @@ export default function RegisterPage() {
           </h1>
 
           <p className="mt-4 text-white/40">
-            Sign in to register for this campus event.
+            Sign in to register for this
+            campus event.
           </p>
 
           <button
-            onClick={() => router.push("/auth")}
+            onClick={() =>
+              router.push("/auth")
+            }
             className="mt-8 rounded-xl bg-fuchsia-500 px-7 py-4 font-black text-white transition hover:scale-105"
           >
             Sign In to Register →
           </button>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push("/")
+            }
             className="ml-3 rounded-xl border border-white/10 px-7 py-4 font-bold text-white/60 hover:bg-white/5"
           >
             Back
           </button>
-
         </div>
       </main>
     );
   }
 
+  const entryCodeEnabled =
+    event.entryCodeEnabled === true ||
+    event.qrEntryEnabled === true;
+
   return (
     <main className="min-h-screen bg-[#08080d] px-6 py-10 text-white">
       <div className="mx-auto max-w-2xl">
-
         <button
-          onClick={() => router.push("/")}
+          onClick={() =>
+            router.push("/")
+          }
           className="mb-8 text-sm text-white/40 hover:text-white"
         >
           ← Back to campus
         </button>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-7 md:p-10">
-
           <p className="text-xs font-black tracking-[0.3em] text-fuchsia-400">
             EVENT REGISTRATION
           </p>
@@ -304,7 +451,6 @@ export default function RegisterPage() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
-
             <span className="rounded-full bg-white/5 px-4 py-2 text-sm text-white/60">
               📅 {event.date}
             </span>
@@ -316,14 +462,12 @@ export default function RegisterPage() {
             <span className="rounded-full bg-white/5 px-4 py-2 text-sm text-white/60">
               📍 {event.venue}
             </span>
-
           </div>
 
           <div className="my-8 border-t border-white/10" />
 
           {alreadyRegistered ? (
             <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-6">
-
               <div className="text-4xl">
                 🎉
               </div>
@@ -333,7 +477,8 @@ export default function RegisterPage() {
               </h2>
 
               <p className="mt-2 text-sm text-green-200/60">
-                Your registration for this event has been saved.
+                Your registration for this
+                event has been saved.
               </p>
 
               <div className="mt-5 space-y-2 text-sm text-white/60">
@@ -349,7 +494,9 @@ export default function RegisterPage() {
 
                 {department && (
                   <p>
-                    <strong>Department:</strong>{" "}
+                    <strong>
+                      Department:
+                    </strong>{" "}
                     {department}
                   </p>
                 )}
@@ -362,20 +509,52 @@ export default function RegisterPage() {
                 )}
               </div>
 
+              {entryCodeEnabled && (
+                <div className="mt-7 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-6 text-center">
+                  <p className="text-xs font-black tracking-[0.25em] text-fuchsia-300">
+                    YOUR ENTRY CODE
+                  </p>
+
+                  {entryCodeLoading ? (
+                    <p className="mt-4 text-sm text-white/50">
+                      Generating your code...
+                    </p>
+                  ) : entryCode ? (
+                    <>
+                      <p className="mt-4 text-4xl font-black tracking-[0.25em] text-white">
+                        {entryCode}
+                      </p>
+
+                      <p className="mt-3 text-xs leading-5 text-white/40">
+                        Show or tell this code to
+                        the event admin at the
+                        entrance.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-4 text-sm text-red-300">
+                      Couldn't generate your
+                      entry code. Please refresh
+                      and try again.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <button
-                onClick={() => router.push("/")}
+                onClick={() =>
+                  router.push("/")
+                }
                 className="mt-7 rounded-xl bg-white px-6 py-3 font-black text-black"
               >
                 Back to Campus →
               </button>
-
             </div>
           ) : (
             <form
               onSubmit={registerForEvent}
               className="space-y-6"
             >
-
               <div>
                 <label className="text-sm font-bold text-white/70">
                   Full name
@@ -385,7 +564,9 @@ export default function RegisterPage() {
                   required
                   value={fullName}
                   onChange={(e) =>
-                    setFullName(e.target.value)
+                    setFullName(
+                      e.target.value
+                    )
                   }
                   placeholder="Your full name"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-fuchsia-400"
@@ -404,7 +585,8 @@ export default function RegisterPage() {
                 />
 
                 <p className="mt-2 text-xs text-white/30">
-                  This is the email associated with your account.
+                  This is the email associated
+                  with your account.
                 </p>
               </div>
 
@@ -416,7 +598,9 @@ export default function RegisterPage() {
                 <input
                   value={department}
                   onChange={(e) =>
-                    setDepartment(e.target.value)
+                    setDepartment(
+                      e.target.value
+                    )
                   }
                   placeholder="e.g. CSE"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-fuchsia-400"
@@ -431,7 +615,9 @@ export default function RegisterPage() {
                 <select
                   value={year}
                   onChange={(e) =>
-                    setYear(e.target.value)
+                    setYear(
+                      e.target.value
+                    )
                   }
                   className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-fuchsia-400"
                 >
@@ -460,7 +646,9 @@ export default function RegisterPage() {
               {message && (
                 <div
                   className={`rounded-xl p-4 text-sm ${
-                    message.includes("successfully")
+                    message.includes(
+                      "successfully"
+                    )
                       ? "bg-green-500/10 text-green-300"
                       : "bg-red-500/10 text-red-300"
                   }`}
@@ -478,12 +666,9 @@ export default function RegisterPage() {
                   ? "Registering..."
                   : "Register for Event →"}
               </button>
-
             </form>
           )}
-
         </div>
-
       </div>
     </main>
   );

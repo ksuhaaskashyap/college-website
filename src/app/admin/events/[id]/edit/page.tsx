@@ -5,56 +5,73 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   doc,
   getDoc,
-  setDoc,
-  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { auth, db } from "@/lib/firebase";
 
-type InteractionType = "none" | "registration" | "poll";
+type InteractionType =
+  | "none"
+  | "registration"
+  | "poll";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 25 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.55,
-      ease: "easeOut" as const,
-    },
-  },
-};
-
-const stagger = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-export default function EventDetailPage() {
+export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
 
   const eventId = params.id as string;
 
-  const [loading, setLoading] = useState(true);
-  const [event, setEvent] = useState<any>(null);
-  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+  const [loadingEvent, setLoadingEvent] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [venue, setVenue] = useState("");
+  const [category, setCategory] = useState("Campus");
+  const [published, setPublished] = useState(true);
 
-  const [selectedOption, setSelectedOption] = useState("");
-  const [savedVote, setSavedVote] = useState("");
-  const [voting, setVoting] = useState(false);
-  const [voteMessage, setVoteMessage] = useState("");
+  // ENTRY CODE
+  const [qrEntryEnabled, setQrEntryEnabled] =
+    useState(false);
+
+  const [interactionType, setInteractionType] =
+    useState<InteractionType>("registration");
+
+  const [pollQuestion, setPollQuestion] =
+    useState("");
+
+  const [pollOptions, setPollOptions] =
+    useState<string[]>([
+      "Yes",
+      "No",
+      "Maybe",
+    ]);
+
+  const [newPollOption, setNewPollOption] =
+    useState("");
+
+  // EVENT PHOTO
+  const [existingImageUrl, setExistingImageUrl] =
+    useState("");
+
+  const [eventPhoto, setEventPhoto] =
+    useState<File | null>(null);
+
+  const [photoPreview, setPhotoPreview] =
+    useState("");
+
+  const [uploadingPhoto, setUploadingPhoto] =
+    useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   /*
    * --------------------------------------------------
-   * AUTH + EXISTING POLL VOTE
+   * CHECK ADMIN
    * --------------------------------------------------
    */
 
@@ -62,54 +79,37 @@ export default function EventDetailPage() {
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user) => {
-        setCurrentUser(user);
-
         if (!user) {
-          setSavedVote("");
-          setSelectedOption("");
+          setIsAdmin(false);
+          setChecking(false);
           return;
         }
 
         try {
-          const voteDoc = await getDoc(
-            doc(
-              db,
-              "pollVotes",
-              `${eventId}_${user.uid}`
-            )
+          const adminDoc = await getDoc(
+            doc(db, "admins", user.uid)
           );
 
-          if (voteDoc.exists()) {
-            const option =
-              voteDoc.data()?.option || "";
+          const admin =
+            adminDoc.exists() &&
+            adminDoc.data()?.role === "admin";
 
-            setSavedVote(option);
-            setSelectedOption(option);
-          } else {
-            setSavedVote("");
-            setSelectedOption("");
-          }
+          setIsAdmin(admin);
         } catch (error) {
-          /*
-           * A missing vote document may be rejected by
-           * the current Firestore read rule.
-           *
-           * That is okay. It simply means that we
-           * should allow the user to vote.
-           */
           console.error(
-            "Failed to check existing vote:",
+            "Admin check failed:",
             error
           );
 
-          setSavedVote("");
-          setSelectedOption("");
+          setIsAdmin(false);
         }
+
+        setChecking(false);
       }
     );
 
     return () => unsubscribe();
-  }, [eventId]);
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -118,182 +118,458 @@ export default function EventDetailPage() {
    */
 
   useEffect(() => {
+    if (!eventId || !isAdmin) {
+      return;
+    }
+
     async function loadEvent() {
       try {
-        setLoading(true);
-        setError("");
+        setLoadingEvent(true);
+        setMessage("");
 
         const eventDoc = await getDoc(
           doc(db, "events", eventId)
         );
 
         if (!eventDoc.exists()) {
-          setError("This event doesn't exist.");
-          setLoading(false);
-          return;
-        }
-
-        const eventData = eventDoc.data();
-
-        if (eventData.published !== true) {
-          setError(
-            "This event is not currently available."
+          setMessage(
+            "This event doesn't exist."
           );
-          setLoading(false);
+          setLoadingEvent(false);
           return;
         }
 
-        setEvent({
-          id: eventDoc.id,
-          ...eventData,
-        });
+        const data = eventDoc.data();
+
+        setTitle(data.title || "");
+        setDescription(
+          data.description || ""
+        );
+        setDate(data.date || "");
+        setTime(data.time || "");
+        setVenue(data.venue || "");
+        setCategory(
+          data.category || "Campus"
+        );
+        setPublished(
+          data.published === true
+        );
+
+        setQrEntryEnabled(
+          data.qrEntryEnabled === true
+        );
+
+        const loadedInteraction =
+          data.interactionType;
+
+        if (
+          loadedInteraction === "none" ||
+          loadedInteraction === "registration" ||
+          loadedInteraction === "poll"
+        ) {
+          setInteractionType(
+            loadedInteraction
+          );
+        } else {
+          setInteractionType(
+            "registration"
+          );
+        }
+
+        if (
+          data.poll &&
+          typeof data.poll === "object"
+        ) {
+          setPollQuestion(
+            data.poll.question || ""
+          );
+
+          if (
+            Array.isArray(data.poll.options) &&
+            data.poll.options.length > 0
+          ) {
+            setPollOptions(
+              data.poll.options.filter(
+                (option: unknown): option is string =>
+                  typeof option === "string" &&
+                  option.trim().length > 0
+              )
+            );
+          }
+        }
+
+        const imageUrl =
+          typeof data.imageUrl === "string"
+            ? data.imageUrl
+            : "";
+
+        setExistingImageUrl(imageUrl);
+        setPhotoPreview(imageUrl);
       } catch (error) {
         console.error(
           "Failed to load event:",
           error
         );
 
-        setError("Couldn't load this event.");
+        setMessage(
+          "Couldn't load this event."
+        );
+      } finally {
+        setLoadingEvent(false);
       }
-
-      setLoading(false);
     }
 
     loadEvent();
-  }, [eventId]);
+  }, [eventId, isAdmin]);
 
   /*
    * --------------------------------------------------
-   * SUBMIT POLL VOTE
+   * PHOTO
    * --------------------------------------------------
    */
 
-  async function submitVote() {
-    if (!currentUser) {
-      setVoteMessage("Please log in to vote.");
+  function handlePhotoChange(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+
+    if (!file) {
       return;
     }
 
-    if (!selectedOption) {
-      setVoteMessage(
-        "Please select an option first."
+    setMessage("");
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setMessage(
+        "Please choose a JPG, PNG or WebP image."
       );
+
+      e.target.value = "";
       return;
     }
 
-    if (savedVote) {
-      setVoteMessage(
-        "You have already voted in this poll."
+    const maxSize = 5 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      setMessage(
+        "Please choose an image smaller than 5 MB."
       );
+
+      e.target.value = "";
       return;
     }
 
-    if (
-      !event ||
-      event.interactionType !== "poll"
-    ) {
-      return;
+    setEventPhoto(file);
+
+    const previewUrl =
+      URL.createObjectURL(file);
+
+    setPhotoPreview(previewUrl);
+  }
+
+  function removePhoto() {
+    setEventPhoto(null);
+    setExistingImageUrl("");
+    setPhotoPreview("");
+    setMessage("");
+  }
+
+  async function uploadPhoto(): Promise<string> {
+    if (!eventPhoto) {
+      return "";
     }
 
-    const pollOptions: string[] =
-      Array.isArray(event.poll?.options)
-        ? event.poll.options.filter(
-            (
-              option: unknown
-            ): option is string =>
-              typeof option === "string" &&
-              option.trim().length > 0
-          )
-        : [];
+    const cloudName =
+      process.env
+        .NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
-    /*
-     * Remove duplicate options.
-     */
-    const uniquePollOptions = Array.from(
-      new Set(
-        pollOptions.map(
-          (option) => option.trim()
-        )
-      )
-    );
+    const uploadPreset =
+      process.env
+        .NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    if (uniquePollOptions.length < 2) {
-      setVoteMessage(
-        "This poll doesn't have enough valid options."
+    if (!cloudName || !uploadPreset) {
+      throw new Error(
+        "Cloudinary configuration is missing."
       );
-      return;
     }
 
-    if (
-      !uniquePollOptions.includes(
-        selectedOption
-      )
-    ) {
-      setVoteMessage(
-        "That option is not available."
-      );
-      return;
-    }
-
-    setVoting(true);
-    setVoteMessage("");
+    setUploadingPhoto(true);
 
     try {
-      /*
-       * The document ID is deterministic:
-       *
-       * eventId_userId
-       *
-       * Firestore rules prevent updates, so the
-       * same user cannot submit another vote.
-       */
-      const voteRef = doc(
-        db,
-        "pollVotes",
-        `${eventId}_${currentUser.uid}`
+      const formData = new FormData();
+
+      formData.append(
+        "file",
+        eventPhoto
       );
 
-      /*
-       * IMPORTANT:
-       *
-       * We intentionally do NOT call getDoc()
-       * before this write.
-       *
-       * A student who has not voted yet may not be
-       * allowed to read a missing pollVotes document.
-       */
-      await setDoc(voteRef, {
-        eventId,
-        userId: currentUser.uid,
-        userEmail: currentUser.email || "",
-        option: selectedOption,
-        votedAt: serverTimestamp(),
-      });
-
-      setSavedVote(selectedOption);
-
-      setVoteMessage(
-        "Your response has been recorded! 🎉"
+      formData.append(
+        "upload_preset",
+        uploadPreset
       );
-    } catch (error: any) {
+
+      formData.append(
+        "folder",
+        "campus-vibe/events"
+      );
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(
+          "Cloudinary upload failed:",
+          data
+        );
+
+        throw new Error(
+          data?.error?.message ||
+            "Photo upload failed."
+        );
+      }
+
+      return data.secure_url || "";
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  /*
+   * --------------------------------------------------
+   * POLL OPTIONS
+   * --------------------------------------------------
+   */
+
+  function addPollOption() {
+    const option =
+      newPollOption.trim();
+
+    if (!option) {
+      return;
+    }
+
+    if (pollOptions.length >= 8) {
+      setMessage(
+        "You can add up to 8 poll options."
+      );
+      return;
+    }
+
+    const alreadyExists =
+      pollOptions.some(
+        (existingOption) =>
+          existingOption.toLowerCase() ===
+          option.toLowerCase()
+      );
+
+    if (alreadyExists) {
+      setMessage(
+        "That poll option already exists."
+      );
+      return;
+    }
+
+    setPollOptions((current) => [
+      ...current,
+      option,
+    ]);
+
+    setNewPollOption("");
+    setMessage("");
+  }
+
+  function removePollOption(
+    index: number
+  ) {
+    setPollOptions((current) =>
+      current.filter(
+        (_, optionIndex) =>
+          optionIndex !== index
+      )
+    );
+  }
+
+  function resetPollOptions() {
+    setPollOptions([
+      "Yes",
+      "No",
+      "Maybe",
+    ]);
+
+    setMessage("");
+  }
+
+  /*
+   * --------------------------------------------------
+   * SAVE EVENT
+   * --------------------------------------------------
+   */
+
+  async function saveEvent(
+    e: React.FormEvent
+  ) {
+    e.preventDefault();
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      if (!eventId) {
+        throw new Error(
+          "Event ID is missing."
+        );
+      }
+
+      let imageUrl = existingImageUrl;
+
+      /*
+       * Upload a replacement photo
+       * if the admin selected one.
+       */
+      if (eventPhoto) {
+        imageUrl = await uploadPhoto();
+
+        if (!imageUrl) {
+          throw new Error(
+            "The photo uploaded but no image URL was returned."
+          );
+        }
+      }
+
+      /*
+       * Validate poll before saving.
+       */
+      if (interactionType === "poll") {
+        const cleanQuestion =
+          pollQuestion.trim();
+
+        const cleanOptions =
+          pollOptions
+            .map((option) =>
+              option.trim()
+            )
+            .filter(Boolean);
+
+        const uniqueOptions =
+          Array.from(
+            new Set(
+              cleanOptions
+            )
+          );
+
+        if (!cleanQuestion) {
+          setMessage(
+            "Please enter a question for the poll."
+          );
+
+          setSaving(false);
+          return;
+        }
+
+        if (uniqueOptions.length < 2) {
+          setMessage(
+            "A poll needs at least 2 options."
+          );
+
+          setSaving(false);
+          return;
+        }
+
+        await updateDoc(
+          doc(db, "events", eventId),
+          {
+            title,
+            description,
+            date,
+            time,
+            venue,
+            category,
+            published,
+
+            qrEntryEnabled,
+
+            interactionType: "poll",
+
+            poll: {
+              question:
+                cleanQuestion,
+              options:
+                uniqueOptions,
+            },
+
+            imageUrl,
+          }
+        );
+      } else {
+        /*
+         * Remove old poll data by replacing
+         * the event with the non-poll fields.
+         *
+         * Firestore updateDoc cannot delete an
+         * existing field unless we explicitly
+         * use deleteField(), so import it below
+         * and use it here.
+         */
+        const { deleteField } =
+          await import(
+            "firebase/firestore"
+          );
+
+        await updateDoc(
+          doc(db, "events", eventId),
+          {
+            title,
+            description,
+            date,
+            time,
+            venue,
+            category,
+            published,
+
+            qrEntryEnabled,
+
+            interactionType,
+
+            poll: deleteField(),
+
+            imageUrl,
+          }
+        );
+      }
+
+      setMessage(
+        "Event updated successfully! 🎉"
+      );
+
+      setTimeout(() => {
+        router.push("/admin/events");
+      }, 700);
+    } catch (error) {
       console.error(
-        "Failed to submit vote:",
+        "Failed to update event:",
         error
       );
 
-      if (
-        error?.code === "permission-denied"
-      ) {
-        setVoteMessage(
-          "You may have already voted in this poll."
-        );
-      } else {
-        setVoteMessage(
-          "Couldn't save your vote. Please try again."
-        );
-      }
-    } finally {
-      setVoting(false);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Couldn't update the event. Please try again."
+      );
+
+      setSaving(false);
     }
   }
 
@@ -303,154 +579,78 @@ export default function EventDetailPage() {
    * --------------------------------------------------
    */
 
-  if (loading) {
+  if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#08080d] text-white">
-        <motion.div
-          initial={{
-            opacity: 0,
-            scale: 0.8,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-          }}
-          transition={{
-            duration: 0.5,
-          }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{
-              rotate: [0, 10, -10, 0],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: 1.5,
-              repeat: Infinity,
-            }}
-            className="mb-4 text-5xl"
-          >
+        <div className="text-center">
+          <div className="mb-4 text-4xl">
             ⚡
-          </motion.div>
+          </div>
+
+          <p className="text-white/50">
+            Checking admin access...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * --------------------------------------------------
+   * ACCESS DENIED
+   * --------------------------------------------------
+   */
+
+  if (!isAdmin) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#08080d] px-6 text-white">
+        <div className="max-w-md text-center">
+          <div className="mb-5 text-6xl">
+            🔒
+          </div>
+
+          <h1 className="text-4xl font-black">
+            Access denied
+          </h1>
+
+          <p className="mt-4 text-white/50">
+            Only administrators can edit events.
+          </p>
+
+          <button
+            onClick={() =>
+              router.push("/admin")
+            }
+            className="mt-8 rounded-xl bg-white px-6 py-3 font-black text-black transition hover:scale-105"
+          >
+            Back to Dashboard →
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * --------------------------------------------------
+   * LOADING EVENT
+   * --------------------------------------------------
+   */
+
+  if (loadingEvent) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#08080d] text-white">
+        <div className="text-center">
+          <div className="mb-4 text-4xl">
+            ✏️
+          </div>
 
           <p className="text-white/50">
             Loading event...
           </p>
-        </motion.div>
+        </div>
       </main>
     );
   }
-
-  /*
-   * --------------------------------------------------
-   * EVENT NOT FOUND
-   * --------------------------------------------------
-   */
-
-  if (!event) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#08080d] px-6 text-white">
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 30,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          className="max-w-lg text-center"
-        >
-          <div className="text-6xl">
-            😕
-          </div>
-
-          <h1 className="mt-6 text-3xl font-black">
-            Event not found
-          </h1>
-
-          <p className="mt-3 text-white/40">
-            {error ||
-              "This event could not be found."}
-          </p>
-
-          <motion.button
-            whileHover={{
-              scale: 1.05,
-            }}
-            whileTap={{
-              scale: 0.97,
-            }}
-            onClick={() => router.push("/")}
-            className="mt-8 rounded-xl bg-white px-7 py-3 font-black text-black"
-          >
-            Back to Campus
-          </motion.button>
-        </motion.div>
-      </main>
-    );
-  }
-
-  /*
-   * --------------------------------------------------
-   * INTERACTION TYPE
-   * --------------------------------------------------
-   */
-
-  const interactionType: InteractionType =
-    event.interactionType === "none" ||
-    event.interactionType === "poll" ||
-    event.interactionType ===
-      "registration"
-      ? event.interactionType
-      : "registration";
-
-  /*
-   * --------------------------------------------------
-   * POLL DATA
-   * --------------------------------------------------
-   */
-
-  const pollQuestion =
-    typeof event.poll?.question === "string"
-      ? event.poll.question.trim()
-      : "";
-
-  const rawPollOptions: string[] =
-    Array.isArray(event.poll?.options)
-      ? event.poll.options.filter(
-          (
-            option: unknown
-          ): option is string =>
-            typeof option === "string" &&
-            option.trim().length > 0
-        )
-      : [];
-
-  /*
-   * Remove duplicate options.
-   *
-   * Example:
-   *
-   * ["Football", "Cricket", "Football"]
-   *
-   * becomes:
-   *
-   * ["Football", "Cricket"]
-   */
-  const pollOptions = Array.from(
-    new Set(
-      rawPollOptions.map(
-        (option) => option.trim()
-      )
-    )
-  );
-
-  const validPoll =
-    interactionType === "poll" &&
-    pollQuestion.length > 0 &&
-    pollOptions.length >= 2;
 
   /*
    * --------------------------------------------------
@@ -459,654 +659,672 @@ export default function EventDetailPage() {
    */
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#08080d] px-4 py-8 text-white sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-4xl">
+    <main className="min-h-screen bg-[#08080d] px-6 py-10 text-white">
+      <div className="mx-auto max-w-3xl">
 
-        {/* BACK BUTTON */}
-
-        <motion.button
-          initial={{
-            opacity: 0,
-            x: -20,
-          }}
-          animate={{
-            opacity: 1,
-            x: 0,
-          }}
-          transition={{
-            duration: 0.5,
-          }}
-          whileHover={{
-            x: -4,
-          }}
-          onClick={() => router.push("/")}
-          className="mb-8 text-sm font-bold text-white/40 transition hover:text-white"
+        <button
+          type="button"
+          onClick={() =>
+            router.push("/admin/events")
+          }
+          className="mb-8 text-sm text-white/40 transition hover:text-white"
         >
-          ← Back to Campus
-        </motion.button>
+          ← Back to Manage Events
+        </button>
 
-        {/* MAIN EVENT CARD */}
+        <p className="text-xs font-black tracking-[0.3em] text-blue-400">
+          SREENIDHI
+        </p>
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 30,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 0.7,
-          }}
-          className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20"
+        <h1 className="mt-3 text-5xl font-black">
+          Edit Event
+        </h1>
+
+        <p className="mt-3 text-white/40">
+          Update your campus event details.
+        </p>
+
+        <form
+          onSubmit={saveEvent}
+          className="mt-10 space-y-6 rounded-3xl border border-white/10 bg-white/[0.04] p-7"
         >
 
-          {/* HERO */}
+          {/* EVENT NAME */}
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/10 px-7 py-12 md:px-12 md:py-16">
+          <div>
+            <label className="text-sm font-bold text-white/70">
+              Event name
+            </label>
 
-            <motion.div
-              animate={{
-                scale: [1, 1.15, 1],
-                opacity: [0.4, 0.7, 0.4],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Infinity,
-                ease: "easeInOut" as const,
-              }}
-              className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-fuchsia-500/10 blur-3xl"
+            <input
+              required
+              value={title}
+              onChange={(e) =>
+                setTitle(e.target.value)
+              }
+              placeholder="Sreenidhi Tech Fest 2026"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
             />
-
-            <motion.div
-              animate={{
-                scale: [1.1, 1, 1.1],
-                opacity: [0.3, 0.6, 0.3],
-              }}
-              transition={{
-                duration: 6,
-                repeat: Infinity,
-                ease: "easeInOut" as const,
-              }}
-              className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"
-            />
-
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              animate="show"
-              className="relative"
-            >
-
-              {/* BADGES */}
-
-              <motion.div
-                variants={fadeUp}
-                className="flex flex-wrap items-center gap-3"
-              >
-                <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-2 text-xs font-black tracking-[0.2em] text-fuchsia-300">
-                  CAMPUS EVENT
-                </span>
-
-                {event.category && (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/60">
-                    {event.category}
-                  </span>
-                )}
-              </motion.div>
-
-              {/* TITLE */}
-
-              <motion.h1
-                variants={fadeUp}
-                className="mt-6 max-w-3xl text-4xl font-black leading-tight md:text-6xl"
-              >
-                {event.title}
-              </motion.h1>
-
-              {/* SHORT DESCRIPTION */}
-
-              {event.description && (
-                <motion.p
-                  variants={fadeUp}
-                  className="mt-6 max-w-2xl text-base leading-8 text-white/50 md:text-lg"
-                >
-                  {event.description}
-                </motion.p>
-              )}
-
-            </motion.div>
           </div>
 
-          {/* EVENT INFORMATION */}
+          {/* DESCRIPTION */}
 
-          <div className="p-7 md:p-12">
+          <div>
+            <label className="text-sm font-bold text-white/70">
+              Description
+            </label>
 
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              animate="show"
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            >
+            <textarea
+              required
+              value={description}
+              onChange={(e) =>
+                setDescription(
+                  e.target.value
+                )
+              }
+              placeholder="Tell students what this event is about..."
+              rows={5}
+              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+            />
+          </div>
 
-              {/* DATE */}
+          {/* EVENT PHOTO */}
 
-              <motion.div
-                variants={fadeUp}
-                whileHover={{
-                  y: -5,
-                }}
-                className="rounded-2xl border border-white/10 bg-black/20 p-5 transition"
-              >
-                <p className="text-xs font-black tracking-[0.2em] text-white/30">
-                  DATE
-                </p>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
 
-                <p className="mt-3 text-lg font-black">
-                  📅 {event.date || "TBA"}
-                </p>
-              </motion.div>
-
-              {/* TIME */}
-
-              <motion.div
-                variants={fadeUp}
-                whileHover={{
-                  y: -5,
-                }}
-                className="rounded-2xl border border-white/10 bg-black/20 p-5 transition"
-              >
-                <p className="text-xs font-black tracking-[0.2em] text-white/30">
-                  TIME
-                </p>
-
-                <p className="mt-3 text-lg font-black">
-                  🕐 {event.time || "TBA"}
-                </p>
-              </motion.div>
-
-              {/* VENUE */}
-
-              <motion.div
-                variants={fadeUp}
-                whileHover={{
-                  y: -5,
-                }}
-                className="rounded-2xl border border-white/10 bg-black/20 p-5 transition sm:col-span-2 lg:col-span-1"
-              >
-                <p className="text-xs font-black tracking-[0.2em] text-white/30">
-                  VENUE
-                </p>
-
-                <p className="mt-3 text-lg font-black">
-                  📍 {event.venue || "TBA"}
-                </p>
-              </motion.div>
-
-            </motion.div>
-
-            {/* DESCRIPTION */}
-
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              whileInView="show"
-              viewport={{
-                once: true,
-                amount: 0.2,
-              }}
-              className="mt-10"
-            >
-              <p className="text-xs font-black tracking-[0.3em] text-fuchsia-400">
-                ABOUT THIS EVENT
+            <div>
+              <p className="text-xs font-black tracking-[0.2em] text-blue-400">
+                EVENT PHOTO
               </p>
 
-              <h2 className="mt-3 text-2xl font-black">
-                What's happening?
+              <h2 className="mt-2 text-xl font-black">
+                Update cover image
               </h2>
 
-              <p className="mt-5 whitespace-pre-wrap text-base leading-8 text-white/50">
-                {event.description ||
-                  "More information about this event will be available soon."}
+              <p className="mt-1 text-sm leading-6 text-white/40">
+                Upload a new JPG, PNG or WebP image up to 5 MB.
               </p>
-            </motion.div>
+            </div>
 
-            {/* REGISTRATION */}
+            {!photoPreview ? (
+              <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center transition hover:border-blue-400/50 hover:bg-blue-400/[0.04]">
 
-            {interactionType ===
-              "registration" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 30,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.2,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="mt-12 rounded-3xl border border-fuchsia-500/20 bg-fuchsia-500/[0.06] p-7 md:p-8"
-              >
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-
-                  <div>
-                    <p className="text-xs font-black tracking-[0.25em] text-fuchsia-400">
-                      READY TO JOIN?
-                    </p>
-
-                    <h2 className="mt-2 text-2xl font-black">
-                      Save your spot.
-                    </h2>
-
-                    <p className="mt-2 text-sm leading-6 text-white/40">
-                      Register for this event and be part of the campus experience.
-                    </p>
-                  </div>
-
-                  <motion.button
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow:
-                        "0 15px 35px rgba(217,70,239,0.25)",
-                    }}
-                    whileTap={{
-                      scale: 0.96,
-                    }}
-                    onClick={() =>
-                      router.push(
-                        `/events/${event.id}/register`
-                      )
-                    }
-                    className="shrink-0 rounded-2xl bg-fuchsia-500 px-8 py-4 font-black text-white shadow-lg shadow-fuchsia-500/20"
-                  >
-                    Register Now →
-                  </motion.button>
-
+                <div className="text-4xl">
+                  📸
                 </div>
-              </motion.div>
-            )}
 
-            {/* POLL */}
-
-            {interactionType === "poll" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 30,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.15,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="mt-12 rounded-3xl border border-cyan-500/20 bg-cyan-500/[0.06] p-7 md:p-8"
-              >
-
-                <p className="text-xs font-black tracking-[0.25em] text-cyan-400">
-                  QUICK POLL
+                <p className="mt-3 font-black">
+                  Choose event photo
                 </p>
 
-                {!validPoll ? (
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                    }}
-                    animate={{
-                      opacity: 1,
-                    }}
-                    className="mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-5"
-                  >
-                    <p className="font-bold text-yellow-300">
-                      This poll isn't available yet.
+                <p className="mt-1 text-xs text-white/30">
+                  JPG, PNG or WebP · Max 5 MB
+                </p>
+
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={
+                    handlePhotoChange
+                  }
+                  className="hidden"
+                />
+
+              </label>
+            ) : (
+              <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+
+                <div className="relative aspect-video w-full">
+                  <img
+                    src={photoPreview}
+                    alt="Event preview"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">
+                      {eventPhoto?.name ||
+                        "Current event photo"}
                     </p>
 
-                    <p className="mt-2 text-sm text-white/40">
-                      The poll needs a question and at least two valid response options.
-                    </p>
-                  </motion.div>
-                ) : (
-                  <>
-
-                    <motion.h2
-                      initial={{
-                        opacity: 0,
-                        y: 15,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      className="mt-3 text-2xl font-black"
-                    >
-                      {pollQuestion}
-                    </motion.h2>
-
-                    <p className="mt-2 text-sm leading-6 text-white/40">
-                      {savedVote
-                        ? "You've already submitted your response."
-                        : "Choose one option below."}
-                    </p>
-
-                    {/* LOGIN MESSAGE */}
-
-                    {!currentUser && (
-                      <motion.div
-                        initial={{
-                          opacity: 0,
-                          scale: 0.97,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                        }}
-                        className="mt-5 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-5"
-                      >
-                        <p className="font-bold text-yellow-300">
-                          Log in to vote
-                        </p>
-
-                        <p className="mt-1 text-sm text-white/40">
-                          You need to be logged in before submitting a response.
-                        </p>
-
-                        <motion.button
-                          whileHover={{
-                            scale: 1.05,
-                          }}
-                          whileTap={{
-                            scale: 0.97,
-                          }}
-                          type="button"
-                          onClick={() =>
-                            router.push("/auth")
-                          }
-                          className="mt-4 rounded-xl bg-white px-5 py-3 text-sm font-black text-black"
-                        >
-                          Log In →
-                        </motion.button>
-                      </motion.div>
+                    {eventPhoto && (
+                      <p className="mt-1 text-xs text-white/30">
+                        {(
+                          eventPhoto.size /
+                          1024 /
+                          1024
+                        ).toFixed(2)}{" "}
+                        MB
+                      </p>
                     )}
+                  </div>
 
-                    {/* POLL OPTIONS */}
+                  <div className="flex gap-2">
 
-                    <motion.div
-                      variants={stagger}
-                      initial="hidden"
-                      animate="show"
-                      className="mt-6 grid gap-3"
-                    >
-                      {pollOptions.map(
-                        (option, index) => {
-                          const isSelected =
-                            selectedOption ===
-                              option ||
-                            savedVote === option;
+                    <label className="cursor-pointer rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/70 transition hover:bg-white/10">
+                      Replace
 
-                          return (
-                            <motion.button
-                              key={`${option}-${index}`}
-                              variants={fadeUp}
-                              whileHover={
-                                !savedVote &&
-                                currentUser
-                                  ? {
-                                      scale: 1.015,
-                                      x: 3,
-                                    }
-                                  : {}
-                              }
-                              whileTap={
-                                !savedVote &&
-                                currentUser
-                                  ? {
-                                      scale: 0.98,
-                                    }
-                                  : {}
-                              }
-                              type="button"
-                              disabled={
-                                !!savedVote ||
-                                voting ||
-                                !currentUser
-                              }
-                              onClick={() => {
-                                setSelectedOption(
-                                  option
-                                );
-                                setVoteMessage("");
-                              }}
-                              className={`group rounded-2xl border p-4 text-left transition ${
-                                isSelected
-                                  ? "border-cyan-400 bg-cyan-400/10"
-                                  : "border-white/10 bg-black/20 hover:border-cyan-400/50 hover:bg-cyan-400/10"
-                              } ${
-                                !currentUser ||
-                                !!savedVote
-                                  ? "cursor-default"
-                                  : ""
-                              }`}
-                            >
-                              <div className="flex items-center gap-4">
-
-                                <motion.div
-                                  animate={
-                                    isSelected
-                                      ? {
-                                          scale: [
-                                            1,
-                                            1.15,
-                                            1,
-                                          ],
-                                        }
-                                      : {
-                                          scale: 1,
-                                        }
-                                  }
-                                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-                                    isSelected
-                                      ? "bg-cyan-400 text-black"
-                                      : "bg-white/10 group-hover:bg-cyan-400 group-hover:text-black"
-                                  }`}
-                                >
-                                  {isSelected
-                                    ? "✓"
-                                    : index + 1}
-                                </motion.div>
-
-                                <span className="font-bold">
-                                  {option}
-                                </span>
-
-                              </div>
-                            </motion.button>
-                          );
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={
+                          handlePhotoChange
                         }
-                      )}
-                    </motion.div>
+                        className="hidden"
+                      />
+                    </label>
 
-                    {/* SUBMIT */}
+                    <button
+                      type="button"
+                      onClick={
+                        removePhoto
+                      }
+                      className="rounded-xl border border-red-400/20 px-4 py-2 text-sm font-bold text-red-300 transition hover:bg-red-400/10"
+                    >
+                      Remove
+                    </button>
 
-                    {currentUser &&
-                      !savedVote && (
-                        <motion.button
-                          whileHover={{
-                            scale: selectedOption
-                              ? 1.01
-                              : 1,
-                          }}
-                          whileTap={{
-                            scale: selectedOption
-                              ? 0.98
-                              : 1,
-                          }}
-                          type="button"
-                          onClick={submitVote}
-                          disabled={
-                            voting ||
-                            !selectedOption
-                          }
-                          className="mt-6 w-full rounded-2xl bg-cyan-400 py-4 font-black text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {voting
-                            ? "Saving response..."
-                            : "Submit Response →"}
-                        </motion.button>
-                      )}
+                  </div>
 
-                    {/* MESSAGE */}
+                </div>
 
-                    {voteMessage && (
-                      <motion.div
-                        initial={{
-                          opacity: 0,
-                          y: 10,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                        }}
-                        className={`mt-4 rounded-xl p-4 text-sm ${
-                          voteMessage.includes(
-                            "recorded"
-                          )
-                            ? "bg-green-500/10 text-green-300"
-                            : "bg-yellow-500/10 text-yellow-300"
-                        }`}
-                      >
-                        {voteMessage}
-                      </motion.div>
-                    )}
-
-                  </>
-                )}
-
-              </motion.div>
+              </div>
             )}
 
-            {/* NO INTERACTION */}
+          </div>
 
-            {interactionType === "none" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 25,
+          {/* DATE + TIME */}
+
+          <div className="grid gap-5 md:grid-cols-2">
+
+            <div>
+              <label className="text-sm font-bold text-white/70">
+                Date
+              </label>
+
+              <input
+                required
+                type="date"
+                value={date}
+                onChange={(e) =>
+                  setDate(e.target.value)
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/70">
+                Time
+              </label>
+
+              <input
+                required
+                type="time"
+                value={time}
+                onChange={(e) =>
+                  setTime(e.target.value)
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+              />
+            </div>
+
+          </div>
+
+          {/* VENUE + CATEGORY */}
+
+          <div className="grid gap-5 md:grid-cols-2">
+
+            <div>
+              <label className="text-sm font-bold text-white/70">
+                Venue
+              </label>
+
+              <input
+                required
+                value={venue}
+                onChange={(e) =>
+                  setVenue(e.target.value)
+                }
+                placeholder="Main Auditorium"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/70">
+                Category
+              </label>
+
+              <select
+                value={category}
+                onChange={(e) =>
+                  setCategory(
+                    e.target.value
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+              >
+                <option>Campus</option>
+                <option>Technical</option>
+                <option>Cultural</option>
+                <option>Sports</option>
+                <option>Workshop</option>
+                <option>Competition</option>
+                <option>Club</option>
+              </select>
+            </div>
+
+          </div>
+
+          {/* EVENT INTERACTION */}
+
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+
+            <div>
+              <p className="text-xs font-black tracking-[0.2em] text-blue-400">
+                EVENT INTERACTION
+              </p>
+
+              <h2 className="mt-2 text-xl font-black">
+                What should students do?
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-white/40">
+                Choose how students can interact with this event.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+
+              {/* NONE */}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInteractionType(
+                    "none"
+                  );
+                  setMessage("");
                 }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.2,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="mt-12 rounded-3xl border border-white/10 bg-white/[0.03] p-7 md:p-8"
+                className={`rounded-2xl border p-4 text-left transition ${
+                  interactionType ===
+                  "none"
+                    ? "border-blue-400 bg-blue-400/10"
+                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                }`}
               >
                 <div className="flex items-center gap-4">
 
-                  <motion.div
-                    animate={{
-                      y: [0, -5, 0],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                    }}
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-xl"
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-full text-lg ${
+                      interactionType ===
+                      "none"
+                        ? "bg-blue-400 text-black"
+                        : "bg-white/10"
+                    }`}
                   >
                     👀
-                  </motion.div>
+                  </div>
 
                   <div>
-                    <p className="text-xs font-black tracking-[0.25em] text-white/40">
-                      EVENT INFO
+                    <p className="font-black">
+                      No interaction
                     </p>
 
-                    <h2 className="mt-1 text-xl font-black">
-                      Just come and enjoy it.
-                    </h2>
-
-                    <p className="mt-1 text-sm text-white/40">
-                      No registration or response is required for this event.
+                    <p className="mt-1 text-xs text-white/40">
+                      Students can simply view the event.
                     </p>
                   </div>
 
                 </div>
-              </motion.div>
+              </button>
+
+              {/* REGISTRATION */}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInteractionType(
+                    "registration"
+                  );
+                  setMessage("");
+                }}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  interactionType ===
+                  "registration"
+                    ? "border-blue-400 bg-blue-400/10"
+                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-full text-lg ${
+                      interactionType ===
+                      "registration"
+                        ? "bg-blue-400 text-black"
+                        : "bg-white/10"
+                    }`}
+                  >
+                    🎟️
+                  </div>
+
+                  <div>
+                    <p className="font-black">
+                      Registration
+                    </p>
+
+                    <p className="mt-1 text-xs text-white/40">
+                      Students can register using Campus Vibe.
+                    </p>
+                  </div>
+
+                </div>
+              </button>
+
+              {/* POLL */}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInteractionType(
+                    "poll"
+                  );
+                  setMessage("");
+                }}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  interactionType ===
+                  "poll"
+                    ? "border-blue-400 bg-blue-400/10"
+                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-full text-lg ${
+                      interactionType ===
+                      "poll"
+                        ? "bg-blue-400 text-black"
+                        : "bg-white/10"
+                    }`}
+                  >
+                    📊
+                  </div>
+
+                  <div>
+                    <p className="font-black">
+                      Poll
+                    </p>
+
+                    <p className="mt-1 text-xs text-white/40">
+                      Ask students a question with custom choices.
+                    </p>
+                  </div>
+
+                </div>
+              </button>
+
+            </div>
+
+            {/* POLL SETTINGS */}
+
+            {interactionType ===
+              "poll" && (
+              <div className="mt-6 space-y-5 border-t border-white/10 pt-6">
+
+                <div>
+                  <label className="text-sm font-bold text-white/70">
+                    Poll question
+                  </label>
+
+                  <input
+                    required
+                    value={
+                      pollQuestion
+                    }
+                    onChange={(e) =>
+                      setPollQuestion(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Are you joining this event?"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none transition focus:border-blue-400"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+
+                    <label className="text-sm font-bold text-white/70">
+                      Response options
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={
+                        resetPollOptions
+                      }
+                      className="text-xs font-bold text-blue-400 transition hover:text-blue-300"
+                    >
+                      Use Yes / No / Maybe
+                    </button>
+
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+
+                    {pollOptions.map(
+                      (
+                        option,
+                        index
+                      ) => (
+                        <div
+                          key={`${option}-${index}`}
+                          className="flex items-center gap-3"
+                        >
+
+                          <div className="flex h-11 flex-1 items-center rounded-xl border border-white/10 bg-black/30 px-4">
+
+                            <span className="mr-3 text-xs font-black text-blue-400">
+                              {index +
+                                1}
+                            </span>
+
+                            <span className="text-sm font-bold">
+                              {option}
+                            </span>
+
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removePollOption(
+                                index
+                              )
+                            }
+                            className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/40 transition hover:border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
+                            aria-label={`Remove ${option}`}
+                          >
+                            ×
+                          </button>
+
+                        </div>
+                      )
+                    )}
+
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+
+                    <input
+                      value={
+                        newPollOption
+                      }
+                      onChange={(e) =>
+                        setNewPollOption(
+                          e.target.value
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (
+                          e.key ===
+                          "Enter"
+                        ) {
+                          e.preventDefault();
+                          addPollOption();
+                        }
+                      }}
+                      placeholder="Add a custom option..."
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none transition focus:border-blue-400"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={
+                        addPollOption
+                      }
+                      className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-blue-400"
+                    >
+                      + Add
+                    </button>
+
+                  </div>
+
+                  <p className="mt-2 text-xs text-white/30">
+                    Use between 2 and 8 response options.
+                  </p>
+
+                </div>
+
+              </div>
             )}
 
           </div>
-        </motion.div>
 
-        {/* BOTTOM NAVIGATION */}
+          {/* ENTRY CODE */}
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            delay: 0.3,
-            duration: 0.5,
-          }}
-          className="mt-8 flex flex-wrap gap-3"
-        >
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
 
-          <motion.button
-            whileHover={{
-              scale: 1.03,
-              x: -2,
-            }}
-            whileTap={{
-              scale: 0.97,
-            }}
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-white/60 transition hover:bg-white/5 hover:text-white"
-          >
-            ← All Events
-          </motion.button>
+            <div>
+              <p className="text-xs font-black tracking-[0.2em] text-blue-400">
+                ENTRY CODE
+              </p>
 
-          {interactionType ===
-            "registration" && (
-            <motion.button
-              whileHover={{
-                scale: 1.05,
-              }}
-              whileTap={{
-                scale: 0.97,
-              }}
-              onClick={() =>
-                router.push(
-                  `/events/${event.id}/register`
+              <h2 className="mt-2 text-xl font-black">
+                Enable entry codes
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-white/40">
+                Registered students can receive a unique 8-character code that admins can use to mark attendance.
+              </p>
+            </div>
+
+            <label className="mt-5 flex cursor-pointer items-center gap-3">
+
+              <input
+                type="checkbox"
+                checked={
+                  qrEntryEnabled
+                }
+                onChange={(e) =>
+                  setQrEntryEnabled(
+                    e.target.checked
+                  )
+                }
+                className="h-5 w-5"
+              />
+
+              <span className="text-sm font-bold text-white/70">
+                Enable Entry Code
+              </span>
+
+            </label>
+
+            <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.03] p-4 text-xs leading-5 text-white/40">
+              Optional — leave this unchecked if this event doesn't need entry codes.
+            </div>
+
+          </div>
+
+          {/* PUBLISH */}
+
+          <label className="flex cursor-pointer items-center gap-3">
+
+            <input
+              type="checkbox"
+              checked={published}
+              onChange={(e) =>
+                setPublished(
+                  e.target.checked
                 )
               }
-              className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black"
+              className="h-5 w-5"
+            />
+
+            <span className="text-sm text-white/70">
+              Publish this event
+            </span>
+
+          </label>
+
+          {/* MESSAGE */}
+
+          {message && (
+            <div
+              className={`rounded-xl p-4 text-sm ${
+                message
+                  .toLowerCase()
+                  .includes(
+                    "successfully"
+                  )
+                  ? "bg-green-500/10 text-green-300"
+                  : "bg-red-500/10 text-red-300"
+              }`}
             >
-              Register →
-            </motion.button>
+              {message}
+            </div>
           )}
 
-        </motion.div>
+          {/* ACTIONS */}
 
+          <div className="flex flex-col gap-3 sm:flex-row">
+
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/admin/events"
+                )
+              }
+              className="flex-1 rounded-xl border border-white/10 py-4 font-black text-white/60 transition hover:bg-white/5 hover:text-white"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={
+                saving ||
+                uploadingPhoto
+              }
+              className="flex-1 rounded-xl bg-blue-500 py-4 font-black text-white transition hover:bg-blue-400 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {uploadingPhoto
+                ? "Uploading photo..."
+                : saving
+                ? "Saving changes..."
+                : "Save Changes →"}
+            </button>
+
+          </div>
+
+        </form>
       </div>
     </main>
   );

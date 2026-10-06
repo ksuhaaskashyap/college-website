@@ -28,6 +28,9 @@ export default function NewEventPage() {
   const [category, setCategory] = useState("Campus");
   const [published, setPublished] = useState(true);
 
+  // QR ENTRY PASS
+  const [qrEntryEnabled, setQrEntryEnabled] = useState(false);
+
   const [interactionType, setInteractionType] =
     useState<InteractionType>("registration");
 
@@ -289,6 +292,10 @@ export default function NewEventPage() {
             venue,
             category,
             published,
+
+            // QR ENTRY PASS
+            qrEntryEnabled,
+
             interactionType: "poll",
 
             poll: {
@@ -312,6 +319,10 @@ export default function NewEventPage() {
             venue,
             category,
             published,
+
+            // QR ENTRY PASS
+            qrEntryEnabled,
+
             interactionType,
 
             imageUrl,
@@ -875,6 +886,51 @@ export default function NewEventPage() {
 
               </div>
             )}
+
+          </div>
+
+          {/* QR ENTRY PASS */}
+
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+
+            <div>
+              <p className="text-xs font-black tracking-[0.2em] text-fuchsia-400">
+                QR ENTRY PASS
+              </p>
+
+              <h2 className="mt-2 text-xl font-black">
+                Enable QR entry
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-white/40">
+                Give registered students a unique 8-character
+code that admins can use to mark attendance.
+              </p>
+            </div>
+
+            <label className="mt-5 flex cursor-pointer items-center gap-3">
+
+              <input
+                type="checkbox"
+                checked={qrEntryEnabled}
+                onChange={(e) =>
+                  setQrEntryEnabled(
+                    e.target.checked
+                  )
+                }
+                className="h-5 w-5"
+              />
+
+              <span className="text-sm font-bold text-white/70">
+                Enable Entry Code
+              </span>
+
+            </label>
+
+            <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.03] p-4 text-xs leading-5 text-white/40">
+              Optional — leave this unchecked if this event
+              doesn't need QR entry.
+            </div>
 
           </div>
 

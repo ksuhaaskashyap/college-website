@@ -337,6 +337,28 @@ export default function AdminPage() {
               Open Campus Website
             </button>
 
+
+<button
+  type="button"
+  onClick={() => router.push("/admin/entry")}
+  className="group rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5 text-left transition hover:border-emerald-400/40 hover:bg-emerald-500/10"
+>
+  <div className="text-3xl">🎟️</div>
+
+  <h2 className="mt-4 text-xl font-black">
+    Entry & Attendance
+  </h2>
+
+  <p className="mt-2 text-sm leading-6 text-white/40">
+    Enter student entry codes and mark attendees.
+  </p>
+
+  <p className="mt-4 text-sm font-black text-emerald-300">
+    Open Entry → 
+  </p>
+</button>
+
+
           </div>
 
         </section>
