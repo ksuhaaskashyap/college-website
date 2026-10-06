@@ -58,29 +58,78 @@ function getString(value: unknown): string {
     : "";
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export async function POST(
   request: NextRequest
 ) {
+  let step = "starting";
+
   try {
+    // --------------------------------------------------
+    // AUTH TOKEN
+    // --------------------------------------------------
+
+    step = "reading authentication token";
+
     const idToken = getBearerToken(request);
 
     if (!idToken) {
       return NextResponse.json(
         {
           error: "Authentication required.",
+          step,
         },
         { status: 401 }
       );
     }
 
-    const decodedToken =
-      await adminAuth.verifyIdToken(idToken);
+    // --------------------------------------------------
+    // VERIFY FIREBASE USER
+    // --------------------------------------------------
+
+    step = "verifying Firebase ID token";
+
+    let decodedToken;
+
+    try {
+      decodedToken =
+        await adminAuth.verifyIdToken(idToken);
+    } catch (error) {
+      console.error(
+        "Firebase ID token verification failed:",
+        error
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Firebase authentication failed.",
+          step,
+          details: errorMessage(error),
+        },
+        { status: 401 }
+      );
+    }
 
     const userId = decodedToken.uid;
 
+    // --------------------------------------------------
+    // REQUEST BODY
+    // --------------------------------------------------
+
+    step = "reading request body";
+
     const body = await request.json();
 
-    const eventId = getString(body?.eventId);
+    const eventId =
+      getString(body?.eventId);
 
     const source: PassSource | "" =
       body?.source === "registration" ||
@@ -92,6 +141,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: "Event ID is required.",
+          step,
         },
         { status: 400 }
       );
@@ -102,10 +152,17 @@ export async function POST(
         {
           error:
             "A valid pass source is required.",
+          step,
         },
         { status: 400 }
       );
     }
+
+    // --------------------------------------------------
+    // LOAD EVENT
+    // --------------------------------------------------
+
+    step = "loading event";
 
     const eventRef = adminDb
       .collection("events")
@@ -118,6 +175,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: "Event not found.",
+          step,
         },
         { status: 404 }
       );
@@ -125,6 +183,12 @@ export async function POST(
 
     const event =
       eventSnapshot.data() || {};
+
+    // --------------------------------------------------
+    // ENTRY CODE CHECK
+    // --------------------------------------------------
+
+    step = "checking entry code setting";
 
     const entryCodeEnabled =
       event.entryCodeEnabled === true ||
@@ -135,10 +199,15 @@ export async function POST(
         {
           error:
             "Entry codes are not enabled for this event.",
+          step,
         },
         { status: 400 }
       );
     }
+
+    // --------------------------------------------------
+    // VERIFY REGISTRATION / POLL
+    // --------------------------------------------------
 
     const registrationId =
       `${eventId}_${userId}`;
@@ -152,6 +221,8 @@ export async function POST(
       | null = null;
 
     if (source === "registration") {
+      step = "checking registration";
+
       if (
         event.interactionType !==
         "registration"
@@ -160,6 +231,7 @@ export async function POST(
           {
             error:
               "This event does not use registration.",
+            step,
           },
           { status: 400 }
         );
@@ -176,6 +248,7 @@ export async function POST(
           {
             error:
               "You must register for this event first.",
+            step,
           },
           { status: 403 }
         );
@@ -192,6 +265,7 @@ export async function POST(
           {
             error:
               "This registration does not belong to you.",
+            step,
           },
           { status: 403 }
         );
@@ -199,6 +273,8 @@ export async function POST(
     }
 
     if (source === "poll") {
+      step = "checking poll response";
+
       if (
         event.interactionType !== "poll"
       ) {
@@ -206,6 +282,7 @@ export async function POST(
           {
             error:
               "This event does not use a poll.",
+            step,
           },
           { status: 400 }
         );
@@ -225,6 +302,7 @@ export async function POST(
           {
             error:
               "You must submit the poll response first.",
+            step,
           },
           { status: 403 }
         );
@@ -245,11 +323,18 @@ export async function POST(
           {
             error:
               "Your poll response does not qualify for an entry code.",
+            step,
           },
           { status: 403 }
         );
       }
     }
+
+    // --------------------------------------------------
+    // PASS
+    // --------------------------------------------------
+
+    step = "loading existing entry pass";
 
     const passId =
       `${eventId}_${userId}`;
@@ -262,6 +347,8 @@ export async function POST(
       await passRef.get();
 
     if (existingPass.exists) {
+      step = "checking existing entry code";
+
       const existingData =
         existingPass.data() || {};
 
@@ -269,6 +356,8 @@ export async function POST(
         getString(existingData.entryCode);
 
       if (!entryCode) {
+        step = "generating missing entry code";
+
         entryCode =
           await generateUniqueEntryCode();
 
@@ -284,6 +373,12 @@ export async function POST(
         entryCode,
       });
     }
+
+    // --------------------------------------------------
+    // FIREBASE USER
+    // --------------------------------------------------
+
+    step = "loading Firebase user";
 
     const firebaseUser =
       await adminAuth.getUser(userId);
@@ -317,8 +412,20 @@ export async function POST(
       emailFromRegistration ||
       emailFromAuth;
 
+    // --------------------------------------------------
+    // GENERATE CODE
+    // --------------------------------------------------
+
+    step = "generating unique entry code";
+
     const entryCode =
       await generateUniqueEntryCode();
+
+    // --------------------------------------------------
+    // CREATE PASS
+    // --------------------------------------------------
+
+    step = "creating entry pass";
 
     await passRef.create({
       eventId,
@@ -351,14 +458,19 @@ export async function POST(
     });
   } catch (error) {
     console.error(
-      "Failed to create entry pass:",
-      error
+      "ENTRY PASS ERROR:",
+      {
+        step,
+        error,
+      }
     );
 
     return NextResponse.json(
       {
         error:
-          "Couldn't create the entry code.",
+          "Entry code generation failed.",
+        step,
+        details: errorMessage(error),
       },
       { status: 500 }
     );
