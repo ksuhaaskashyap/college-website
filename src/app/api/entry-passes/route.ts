@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 
+export const runtime = "nodejs";
+
 type PassSource = "registration" | "poll";
 
 const ENTRY_CODE_ALPHABET =
@@ -50,9 +52,7 @@ async function generateUniqueEntryCode() {
   );
 }
 
-function getString(
-  value: unknown
-): string {
+function getString(value: unknown): string {
   return typeof value === "string"
     ? value.trim()
     : "";
@@ -62,40 +62,25 @@ export async function POST(
   request: NextRequest
 ) {
   try {
-    // --------------------------------------------------
-    // AUTHENTICATION
-    // --------------------------------------------------
-
-    const idToken =
-      getBearerToken(request);
+    const idToken = getBearerToken(request);
 
     if (!idToken) {
       return NextResponse.json(
         {
-          error:
-            "Authentication required.",
+          error: "Authentication required.",
         },
         { status: 401 }
       );
     }
 
     const decodedToken =
-      await adminAuth.verifyIdToken(
-        idToken
-      );
+      await adminAuth.verifyIdToken(idToken);
 
-    const userId =
-      decodedToken.uid;
+    const userId = decodedToken.uid;
 
-    // --------------------------------------------------
-    // REQUEST BODY
-    // --------------------------------------------------
+    const body = await request.json();
 
-    const body =
-      await request.json();
-
-    const eventId =
-      getString(body?.eventId);
+    const eventId = getString(body?.eventId);
 
     const source: PassSource | "" =
       body?.source === "registration" ||
@@ -106,8 +91,7 @@ export async function POST(
     if (!eventId) {
       return NextResponse.json(
         {
-          error:
-            "Event ID is required.",
+          error: "Event ID is required.",
         },
         { status: 400 }
       );
@@ -123,10 +107,6 @@ export async function POST(
       );
     }
 
-    // --------------------------------------------------
-    // LOAD EVENT
-    // --------------------------------------------------
-
     const eventRef = adminDb
       .collection("events")
       .doc(eventId);
@@ -137,8 +117,7 @@ export async function POST(
     if (!eventSnapshot.exists) {
       return NextResponse.json(
         {
-          error:
-            "Event not found.",
+          error: "Event not found.",
         },
         { status: 404 }
       );
@@ -147,8 +126,6 @@ export async function POST(
     const event =
       eventSnapshot.data() || {};
 
-    // Support both the new field and
-    // the old compatibility field.
     const entryCodeEnabled =
       event.entryCodeEnabled === true ||
       event.qrEntryEnabled === true;
@@ -163,10 +140,6 @@ export async function POST(
       );
     }
 
-    // --------------------------------------------------
-    // VERIFY REGISTRATION / POLL
-    // --------------------------------------------------
-
     const registrationId =
       `${eventId}_${userId}`;
 
@@ -177,10 +150,6 @@ export async function POST(
     let pollData:
       | Record<string, unknown>
       | null = null;
-
-    // --------------------------------------------------
-    // REGISTRATION EVENT
-    // --------------------------------------------------
 
     if (source === "registration") {
       if (
@@ -202,9 +171,7 @@ export async function POST(
           .doc(registrationId)
           .get();
 
-      if (
-        !registrationSnapshot.exists
-      ) {
+      if (!registrationSnapshot.exists) {
         return NextResponse.json(
           {
             error:
@@ -231,14 +198,9 @@ export async function POST(
       }
     }
 
-    // --------------------------------------------------
-    // POLL EVENT
-    // --------------------------------------------------
-
     if (source === "poll") {
       if (
-        event.interactionType !==
-        "poll"
+        event.interactionType !== "poll"
       ) {
         return NextResponse.json(
           {
@@ -272,9 +234,7 @@ export async function POST(
         voteSnapshot.data() || {};
 
       const qrPassOption =
-        getString(
-          event.qrPassOption
-        );
+        getString(event.qrPassOption);
 
       if (
         qrPassOption &&
@@ -291,27 +251,12 @@ export async function POST(
       }
     }
 
-    // --------------------------------------------------
-    // DETERMINISTIC PASS ID
-    // --------------------------------------------------
-    //
-    // One student can have only one entry pass
-    // for one event.
-    //
-    // This avoids the previous composite Firestore
-    // query and makes repeated requests safe.
-    //
-
     const passId =
       `${eventId}_${userId}`;
 
     const passRef = adminDb
       .collection("entryPasses")
       .doc(passId);
-
-    // --------------------------------------------------
-    // CHECK EXISTING PASS
-    // --------------------------------------------------
 
     const existingPass =
       await passRef.get();
@@ -321,12 +266,8 @@ export async function POST(
         existingPass.data() || {};
 
       let entryCode =
-        getString(
-          existingData.entryCode
-        );
+        getString(existingData.entryCode);
 
-      // Older pass without a code:
-      // generate one and update it.
       if (!entryCode) {
         entryCode =
           await generateUniqueEntryCode();
@@ -344,14 +285,8 @@ export async function POST(
       });
     }
 
-    // --------------------------------------------------
-    // GET AUTH USER
-    // --------------------------------------------------
-
     const firebaseUser =
-      await adminAuth.getUser(
-        userId
-      );
+      await adminAuth.getUser(userId);
 
     const nameFromAuth =
       firebaseUser.displayName?.trim() ||
@@ -382,20 +317,11 @@ export async function POST(
       emailFromRegistration ||
       emailFromAuth;
 
-    // --------------------------------------------------
-    // GENERATE UNIQUE CODE
-    // --------------------------------------------------
-
     const entryCode =
       await generateUniqueEntryCode();
 
-    // --------------------------------------------------
-    // CREATE PASS
-    // --------------------------------------------------
-
     await passRef.create({
       eventId,
-
       userId,
 
       registrationId:
@@ -404,13 +330,11 @@ export async function POST(
           : null,
 
       source,
-
       entryCode,
 
       status: "active",
 
       attendeeName,
-
       attendeeEmail,
 
       createdAt:
@@ -418,10 +342,6 @@ export async function POST(
 
       scannedAt: null,
     });
-
-    // --------------------------------------------------
-    // SUCCESS
-    // --------------------------------------------------
 
     return NextResponse.json({
       success: true,
