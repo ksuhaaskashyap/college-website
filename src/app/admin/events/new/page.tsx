@@ -28,8 +28,9 @@ export default function NewEventPage() {
   const [category, setCategory] = useState("Campus");
   const [published, setPublished] = useState(true);
 
-  // QR ENTRY PASS
-  const [qrEntryEnabled, setQrEntryEnabled] = useState(false);
+  // ENTRY CODE
+  const [entryCodeEnabled, setEntryCodeEnabled] =
+    useState(false);
 
   const [interactionType, setInteractionType] =
     useState<InteractionType>("registration");
@@ -90,7 +91,6 @@ export default function NewEventPage() {
 
     setMessage("");
 
-    // Only allow common image formats
     const allowedTypes = [
       "image/jpeg",
       "image/png",
@@ -105,7 +105,6 @@ export default function NewEventPage() {
       return;
     }
 
-    // Keep uploads reasonably small
     const maxSize = 5 * 1024 * 1024;
 
     if (file.size > maxSize) {
@@ -193,7 +192,9 @@ export default function NewEventPage() {
     }
 
     if (pollOptions.length >= 8) {
-      setMessage("You can add up to 8 poll options.");
+      setMessage(
+        "You can add up to 8 poll options."
+      );
       return;
     }
 
@@ -204,7 +205,9 @@ export default function NewEventPage() {
     );
 
     if (alreadyExists) {
-      setMessage("That poll option already exists.");
+      setMessage(
+        "That poll option already exists."
+      );
       return;
     }
 
@@ -293,8 +296,9 @@ export default function NewEventPage() {
             category,
             published,
 
-            // QR ENTRY PASS
-            qrEntryEnabled,
+            // ENTRY CODE
+            entryCodeEnabled,
+            qrEntryEnabled: entryCodeEnabled,
 
             interactionType: "poll",
 
@@ -320,8 +324,9 @@ export default function NewEventPage() {
             category,
             published,
 
-            // QR ENTRY PASS
-            qrEntryEnabled,
+            // ENTRY CODE
+            entryCodeEnabled,
+            qrEntryEnabled: entryCodeEnabled,
 
             interactionType,
 
@@ -889,22 +894,22 @@ export default function NewEventPage() {
 
           </div>
 
-          {/* QR ENTRY PASS */}
+          {/* ENTRY CODE */}
 
           <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
 
             <div>
               <p className="text-xs font-black tracking-[0.2em] text-fuchsia-400">
-                QR ENTRY PASS
+                ENTRY CODE
               </p>
 
               <h2 className="mt-2 text-xl font-black">
-                Enable QR entry
+                Enable entry codes
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-white/40">
                 Give registered students a unique 8-character
-code that admins can use to mark attendance.
+                code that admins can use to mark attendance.
               </p>
             </div>
 
@@ -912,9 +917,9 @@ code that admins can use to mark attendance.
 
               <input
                 type="checkbox"
-                checked={qrEntryEnabled}
+                checked={entryCodeEnabled}
                 onChange={(e) =>
-                  setQrEntryEnabled(
+                  setEntryCodeEnabled(
                     e.target.checked
                   )
                 }
@@ -929,7 +934,7 @@ code that admins can use to mark attendance.
 
             <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.03] p-4 text-xs leading-5 text-white/40">
               Optional — leave this unchecked if this event
-              doesn't need QR entry.
+              doesn't need attendance entry codes.
             </div>
 
           </div>

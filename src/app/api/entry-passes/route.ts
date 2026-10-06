@@ -50,40 +50,52 @@ async function generateUniqueEntryCode() {
   );
 }
 
-function timestampToISOString(value: any) {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value.toDate === "function") {
-    return value.toDate().toISOString();
-  }
-
-  return null;
+function getString(
+  value: unknown
+): string {
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest
+) {
   try {
-    const idToken = getBearerToken(request);
+    // --------------------------------------------------
+    // AUTHENTICATION
+    // --------------------------------------------------
+
+    const idToken =
+      getBearerToken(request);
 
     if (!idToken) {
       return NextResponse.json(
-        { error: "Authentication required." },
+        {
+          error:
+            "Authentication required.",
+        },
         { status: 401 }
       );
     }
 
     const decodedToken =
-      await adminAuth.verifyIdToken(idToken);
+      await adminAuth.verifyIdToken(
+        idToken
+      );
 
-    const userId = decodedToken.uid;
+    const userId =
+      decodedToken.uid;
 
-    const body = await request.json();
+    // --------------------------------------------------
+    // REQUEST BODY
+    // --------------------------------------------------
+
+    const body =
+      await request.json();
 
     const eventId =
-      typeof body?.eventId === "string"
-        ? body.eventId.trim()
-        : "";
+      getString(body?.eventId);
 
     const source: PassSource | "" =
       body?.source === "registration" ||
@@ -93,33 +105,50 @@ export async function POST(request: NextRequest) {
 
     if (!eventId) {
       return NextResponse.json(
-        { error: "Event ID is required." },
+        {
+          error:
+            "Event ID is required.",
+        },
         { status: 400 }
       );
     }
 
     if (!source) {
       return NextResponse.json(
-        { error: "A valid pass source is required." },
+        {
+          error:
+            "A valid pass source is required.",
+        },
         { status: 400 }
       );
     }
+
+    // --------------------------------------------------
+    // LOAD EVENT
+    // --------------------------------------------------
 
     const eventRef = adminDb
       .collection("events")
       .doc(eventId);
 
-    const eventSnapshot = await eventRef.get();
+    const eventSnapshot =
+      await eventRef.get();
 
     if (!eventSnapshot.exists) {
       return NextResponse.json(
-        { error: "Event not found." },
+        {
+          error:
+            "Event not found.",
+        },
         { status: 404 }
       );
     }
 
-    const event = eventSnapshot.data() || {};
+    const event =
+      eventSnapshot.data() || {};
 
+    // Support both the new field and
+    // the old compatibility field.
     const entryCodeEnabled =
       event.entryCodeEnabled === true ||
       event.qrEntryEnabled === true;
@@ -134,6 +163,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // --------------------------------------------------
+    // VERIFY REGISTRATION / POLL
+    // --------------------------------------------------
+
     const registrationId =
       `${eventId}_${userId}`;
 
@@ -144,6 +177,10 @@ export async function POST(request: NextRequest) {
     let pollData:
       | Record<string, unknown>
       | null = null;
+
+    // --------------------------------------------------
+    // REGISTRATION EVENT
+    // --------------------------------------------------
 
     if (source === "registration") {
       if (
@@ -165,7 +202,9 @@ export async function POST(request: NextRequest) {
           .doc(registrationId)
           .get();
 
-      if (!registrationSnapshot.exists) {
+      if (
+        !registrationSnapshot.exists
+      ) {
         return NextResponse.json(
           {
             error:
@@ -179,7 +218,8 @@ export async function POST(request: NextRequest) {
         registrationSnapshot.data() || {};
 
       if (
-        registrationData.userId !== userId
+        registrationData.userId !==
+        userId
       ) {
         return NextResponse.json(
           {
@@ -191,9 +231,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // --------------------------------------------------
+    // POLL EVENT
+    // --------------------------------------------------
+
     if (source === "poll") {
       if (
-        event.interactionType !== "poll"
+        event.interactionType !==
+        "poll"
       ) {
         return NextResponse.json(
           {
@@ -227,13 +272,14 @@ export async function POST(request: NextRequest) {
         voteSnapshot.data() || {};
 
       const qrPassOption =
-        typeof event.qrPassOption === "string"
-          ? event.qrPassOption.trim()
-          : "";
+        getString(
+          event.qrPassOption
+        );
 
       if (
         qrPassOption &&
-        pollData.option !== qrPassOption
+        pollData.option !==
+          qrPassOption
       ) {
         return NextResponse.json(
           {
@@ -245,32 +291,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const existingPasses =
-      await adminDb
-        .collection("entryPasses")
-        .where("eventId", "==", eventId)
-        .where("userId", "==", userId)
-        .limit(1)
-        .get();
+    // --------------------------------------------------
+    // DETERMINISTIC PASS ID
+    // --------------------------------------------------
+    //
+    // One student can have only one entry pass
+    // for one event.
+    //
+    // This avoids the previous composite Firestore
+    // query and makes repeated requests safe.
+    //
 
-    if (!existingPasses.empty) {
-      const existingPass =
-        existingPasses.docs[0];
+    const passId =
+      `${eventId}_${userId}`;
 
+    const passRef = adminDb
+      .collection("entryPasses")
+      .doc(passId);
+
+    // --------------------------------------------------
+    // CHECK EXISTING PASS
+    // --------------------------------------------------
+
+    const existingPass =
+      await passRef.get();
+
+    if (existingPass.exists) {
       const existingData =
-        existingPass.data();
+        existingPass.data() || {};
 
       let entryCode =
-        typeof existingData.entryCode ===
-        "string"
-          ? existingData.entryCode
-          : "";
+        getString(
+          existingData.entryCode
+        );
 
+      // Older pass without a code:
+      // generate one and update it.
       if (!entryCode) {
         entryCode =
           await generateUniqueEntryCode();
 
-        await existingPass.ref.update({
+        await passRef.update({
           entryCode,
         });
       }
@@ -278,59 +339,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         existing: true,
-        passId: existingPass.id,
+        passId,
         entryCode,
       });
     }
 
+    // --------------------------------------------------
+    // GET AUTH USER
+    // --------------------------------------------------
+
     const firebaseUser =
-      await adminAuth.getUser(userId);
+      await adminAuth.getUser(
+        userId
+      );
 
     const nameFromAuth =
-      firebaseUser.displayName?.trim() || "";
+      firebaseUser.displayName?.trim() ||
+      "";
 
     const emailFromAuth =
-      firebaseUser.email?.trim() || "";
+      firebaseUser.email?.trim() ||
+      "";
 
     const nameFromRegistration =
-      typeof registrationData?.fullName ===
-      "string"
-        ? registrationData.fullName.trim()
-        : "";
+      getString(
+        registrationData?.fullName
+      );
 
     const emailFromRegistration =
-      typeof registrationData?.email ===
-      "string"
-        ? registrationData.email.trim()
-        : "";
+      getString(
+        registrationData?.email
+      );
 
     const attendeeName =
-      nameFromAuth ||
       nameFromRegistration ||
+      nameFromAuth ||
+      emailFromRegistration ||
       emailFromAuth ||
       "Campus Vibe attendee";
 
     const attendeeEmail =
-      emailFromAuth ||
-      emailFromRegistration;
+      emailFromRegistration ||
+      emailFromAuth;
+
+    // --------------------------------------------------
+    // GENERATE UNIQUE CODE
+    // --------------------------------------------------
 
     const entryCode =
       await generateUniqueEntryCode();
 
-    const passId =
-      crypto.randomBytes(32).toString("hex");
+    // --------------------------------------------------
+    // CREATE PASS
+    // --------------------------------------------------
 
-    const passRef = adminDb
-      .collection("entryPasses")
-      .doc(passId);
-
-    await passRef.set({
+    await passRef.create({
       eventId,
+
       userId,
+
       registrationId:
         source === "registration"
           ? registrationId
           : null,
+
       source,
 
       entryCode,
@@ -338,6 +410,7 @@ export async function POST(request: NextRequest) {
       status: "active",
 
       attendeeName,
+
       attendeeEmail,
 
       createdAt:
@@ -345,6 +418,10 @@ export async function POST(request: NextRequest) {
 
       scannedAt: null,
     });
+
+    // --------------------------------------------------
+    // SUCCESS
+    // --------------------------------------------------
 
     return NextResponse.json({
       success: true,
