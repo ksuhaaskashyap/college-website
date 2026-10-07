@@ -12,6 +12,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { motion, type Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
+import EventCountdown from "@/components/EventCountdown";
 
 type EventItem = {
   id: string;
@@ -33,12 +34,10 @@ type NotificationItem = {
   type: string;
   published?: boolean;
 
-  // Personal notification fields
   recipientId?: string;
   actorId?: string;
   postId?: string;
 
-  // Read state
   read?: boolean;
 
   createdAt?: any;
@@ -627,8 +626,6 @@ export default function Home() {
 
         <div className="mx-auto max-w-7xl px-5 md:px-8">
 
-          {/* TOP ROW */}
-
           <div className="flex min-h-[72px] items-center justify-between">
 
             {/* BRAND */}
@@ -677,35 +674,25 @@ export default function Home() {
                 About
               </a>
 
-              {/* COMMUNITY */}
-
               <button
                 onClick={() =>
-                  router.push(
-                    "/community"
-                  )
+                  router.push("/community")
                 }
                 className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-bold text-cyan-300 transition hover:scale-105 hover:bg-cyan-400/20"
               >
                 👥 Community
               </button>
 
-              {/* ADMIN */}
-
               {isAdmin && (
                 <button
                   onClick={() =>
-                    router.push(
-                      "/admin"
-                    )
+                    router.push("/admin")
                   }
                   className="rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2 text-sm font-bold text-fuchsia-300 transition hover:bg-fuchsia-500/20"
                 >
                   🛠️ Admin
                 </button>
               )}
-
-              {/* NOTIFICATIONS */}
 
               {isLoggedIn && (
                 <button
@@ -730,8 +717,6 @@ export default function Home() {
                 </button>
               )}
 
-              {/* LOGIN / LOGOUT */}
-
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}
@@ -742,9 +727,7 @@ export default function Home() {
               ) : (
                 <button
                   onClick={() =>
-                    router.push(
-                      "/auth"
-                    )
+                    router.push("/auth")
                   }
                   className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:scale-105"
                 >
@@ -848,8 +831,6 @@ export default function Home() {
                 >
                   ℹ️ About
                 </a>
-
-                {/* COMMUNITY MOBILE */}
 
                 <button
                   onClick={() => {
@@ -1419,6 +1400,13 @@ export default function Home() {
                       <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/40">
                         {event.description}
                       </p>
+
+                      {/* EVENT COUNTDOWN */}
+                      <EventCountdown
+                        date={event.date}
+                        time={event.time}
+                        compact
+                      />
 
                       <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
 

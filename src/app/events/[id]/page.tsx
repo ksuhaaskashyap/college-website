@@ -14,6 +14,7 @@ import {
   type Variants,
 } from "framer-motion";
 import { auth, db } from "@/lib/firebase";
+import EventCountdown from "@/components/EventCountdown";
 
 type InteractionType = "none" | "registration" | "poll";
 
@@ -494,6 +495,13 @@ export default function EventDetailPage() {
               </motion.div>
 
             </motion.div>
+
+            {/* EVENT COUNTDOWN */}
+
+            <EventCountdown
+              date={event.date}
+              time={event.time}
+            />
 
             {/* DESCRIPTION */}
 
