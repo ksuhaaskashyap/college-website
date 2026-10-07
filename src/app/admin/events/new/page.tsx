@@ -261,6 +261,38 @@ export default function NewEventPage() {
         }
       }
 
+      /*
+       * Description is intentionally optional.
+       * An empty description is allowed.
+       */
+      const cleanTitle = title.trim();
+      const cleanDescription = description.trim();
+      const cleanVenue = venue.trim();
+
+      if (!cleanTitle) {
+        setMessage("Please enter an event name.");
+        setSaving(false);
+        return;
+      }
+
+      if (!date) {
+        setMessage("Please select an event date.");
+        setSaving(false);
+        return;
+      }
+
+      if (!time) {
+        setMessage("Please select an event time.");
+        setSaving(false);
+        return;
+      }
+
+      if (!cleanVenue) {
+        setMessage("Please enter the event venue.");
+        setSaving(false);
+        return;
+      }
+
       if (interactionType === "poll") {
         const cleanQuestion =
           pollQuestion.trim();
@@ -288,11 +320,11 @@ export default function NewEventPage() {
         await addDoc(
           collection(db, "events"),
           {
-            title,
-            description,
+            title: cleanTitle,
+            description: cleanDescription,
             date,
             time,
-            venue,
+            venue: cleanVenue,
             category,
             published,
 
@@ -316,11 +348,11 @@ export default function NewEventPage() {
         await addDoc(
           collection(db, "events"),
           {
-            title,
-            description,
+            title: cleanTitle,
+            description: cleanDescription,
             date,
             time,
-            venue,
+            venue: cleanVenue,
             category,
             published,
 
@@ -451,11 +483,13 @@ export default function NewEventPage() {
 
           <div>
             <label className="text-sm font-bold text-white/70">
-              Description
+              Description{" "}
+              <span className="text-white/30">
+                (optional)
+              </span>
             </label>
 
             <textarea
-              required
               value={description}
               onChange={(e) =>
                 setDescription(e.target.value)

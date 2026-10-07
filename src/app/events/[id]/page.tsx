@@ -84,11 +84,6 @@ export default function EventDetailPage() {
           setSelectedOption("");
         }
       } catch (error) {
-        /*
-         * A missing vote document can be rejected by the current
-         * Firestore read rule. That is okay — it simply means
-         * the student has not voted yet.
-         */
         console.error("Failed to check existing vote:", error);
 
         setSavedVote("");
@@ -185,23 +180,6 @@ export default function EventDetailPage() {
         `${eventId}_${currentUser.uid}`
       );
 
-      /*
-       * IMPORTANT:
-       *
-       * Do not perform another getDoc() here.
-       *
-       * A student who has not voted yet may not be allowed
-       * to read a non-existent pollVotes document by the
-       * current Firestore rules.
-       *
-       * Firestore security rules already guarantee that:
-       *
-       * - the document belongs to the signed-in user
-       * - the eventId is valid
-       * - the vote document ID is eventId_userId
-       * - the vote is created only once
-       * - updates are not allowed
-       */
       await setDoc(voteRef, {
         eventId,
         userId: currentUser.uid,
@@ -218,10 +196,6 @@ export default function EventDetailPage() {
     } catch (error: any) {
       console.error("Failed to submit vote:", error);
 
-      /*
-       * If the document already exists, Firestore will reject
-       * the second write because our rules do not allow updates.
-       */
       if (error?.code === "permission-denied") {
         setVoteMessage(
           "You may have already voted in this poll."
@@ -332,22 +306,31 @@ export default function EventDetailPage() {
     pollQuestion.trim().length > 0 &&
     pollOptions.length >= 2;
 
+  const hasDescription =
+    typeof event.description === "string" &&
+    event.description.trim().length > 0;
+
   return (
-    <main className="min-h-screen overflow-hidden bg-[#08080d] px-4 py-8 text-white sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-4xl">
+    <main className="min-h-screen w-full overflow-hidden bg-[#08080d] text-white">
+
+      {/* FULL SCREEN EVENT AREA */}
+
+      <div className="w-full">
 
         {/* BACK BUTTON */}
 
-        <motion.button
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          whileHover={{ x: -4 }}
-          onClick={() => router.push("/")}
-          className="mb-8 text-sm font-bold text-white/40 transition hover:text-white"
-        >
-          ← Back to Campus
-        </motion.button>
+        <div className="px-5 py-6 sm:px-8 md:px-12">
+          <motion.button
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            whileHover={{ x: -4 }}
+            onClick={() => router.push("/")}
+            className="text-sm font-bold text-white/40 transition hover:text-white"
+          >
+            ← Back to Campus
+          </motion.button>
+        </div>
 
         {/* MAIN EVENT CARD */}
 
@@ -355,12 +338,20 @@ export default function EventDetailPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
-          className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20"
+          className="w-full overflow-hidden border-y border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20"
         >
 
           {/* HERO */}
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/10 px-7 py-12 md:px-12 md:py-16">
+          <div
+            className={`relative flex min-h-[390px] overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/10 px-6 md:min-h-[430px] md:px-12 lg:px-20 ${
+              hasDescription
+                ? "items-center py-14 md:py-20"
+                : "items-center justify-center py-14 md:py-20"
+            }`}
+          >
+
+            {/* GLOW */}
 
             <motion.div
               animate={{
@@ -372,7 +363,7 @@ export default function EventDetailPage() {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-fuchsia-500/10 blur-3xl"
+              className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl"
             />
 
             <motion.div
@@ -385,48 +376,41 @@ export default function EventDetailPage() {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"
+              className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl"
             />
+
+            {/* HERO CONTENT */}
 
             <motion.div
               variants={stagger}
               initial="hidden"
               animate="show"
-              className="relative"
+              className={`relative w-full ${
+                hasDescription
+                  ? "max-w-6xl"
+                  : "flex max-w-6xl flex-col items-center justify-center text-center"
+              }`}
             >
-
-              {/* BADGES */}
-
-              <motion.div
-                variants={fadeUp}
-                className="flex flex-wrap items-center gap-3"
-              >
-                <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-2 text-xs font-black tracking-[0.2em] text-fuchsia-300">
-                  CAMPUS EVENT
-                </span>
-
-                {event.category && (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/60">
-                    {event.category}
-                  </span>
-                )}
-              </motion.div>
 
               {/* TITLE */}
 
               <motion.h1
                 variants={fadeUp}
-                className="mt-6 max-w-3xl text-4xl font-black leading-tight md:text-6xl"
+                className={`font-black leading-tight ${
+                  hasDescription
+                    ? "max-w-5xl text-4xl md:text-6xl lg:text-7xl"
+                    : "max-w-5xl text-4xl md:text-6xl lg:text-7xl"
+                }`}
               >
                 {event.title}
               </motion.h1>
 
-              {/* SHORT DESCRIPTION */}
+              {/* DESCRIPTION */}
 
-              {event.description && (
+              {hasDescription && (
                 <motion.p
                   variants={fadeUp}
-                  className="mt-6 max-w-2xl text-base leading-8 text-white/50 md:text-lg"
+                  className="mt-6 max-w-3xl text-base leading-8 text-white/50 md:text-lg"
                 >
                   {event.description}
                 </motion.p>
@@ -435,15 +419,26 @@ export default function EventDetailPage() {
             </motion.div>
           </div>
 
-          {/* EVENT INFORMATION */}
+          {/* EVENT CONTENT */}
 
-          <div className="p-7 md:p-12">
+          <div className="w-full px-5 py-8 sm:px-8 md:px-12 md:py-12 lg:px-20">
+
+            {/* EVENT COUNTDOWN FIRST */}
+
+            <div className="w-full">
+              <EventCountdown
+                date={event.date}
+                time={event.time}
+              />
+            </div>
+
+            {/* EVENT INFORMATION */}
 
             <motion.div
               variants={stagger}
               initial="hidden"
               animate="show"
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             >
 
               {/* DATE */}
@@ -495,13 +490,6 @@ export default function EventDetailPage() {
               </motion.div>
 
             </motion.div>
-
-            {/* EVENT COUNTDOWN */}
-
-            <EventCountdown
-              date={event.date}
-              time={event.time}
-            />
 
             {/* DESCRIPTION */}
 
@@ -840,56 +828,58 @@ export default function EventDetailPage() {
 
         {/* BOTTOM NAVIGATION */}
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            delay: 0.3,
-            duration: 0.5,
-          }}
-          className="mt-8 flex flex-wrap gap-3"
-        >
-
-          <motion.button
-            whileHover={{
-              scale: 1.03,
-              x: -2,
+        <div className="px-5 py-8 sm:px-8 md:px-12 lg:px-20">
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 20,
             }}
-            whileTap={{
-              scale: 0.97,
+            animate={{
+              opacity: 1,
+              y: 0,
             }}
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-white/60 transition hover:bg-white/5 hover:text-white"
+            transition={{
+              delay: 0.3,
+              duration: 0.5,
+            }}
+            className="flex flex-wrap gap-3"
           >
-            ← All Events
-          </motion.button>
 
-          {interactionType === "registration" && (
             <motion.button
               whileHover={{
-                scale: 1.05,
+                scale: 1.03,
+                x: -2,
               }}
               whileTap={{
                 scale: 0.97,
               }}
-              onClick={() =>
-                router.push(
-                  `/events/${event.id}/register`
-                )
-              }
-              className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black"
+              onClick={() => router.push("/")}
+              className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-white/60 transition hover:bg-white/5 hover:text-white"
             >
-              Register →
+              ← All Events
             </motion.button>
-          )}
 
-        </motion.div>
+            {interactionType === "registration" && (
+              <motion.button
+                whileHover={{
+                  scale: 1.05,
+                }}
+                whileTap={{
+                  scale: 0.97,
+                }}
+                onClick={() =>
+                  router.push(
+                    `/events/${event.id}/register`
+                  )
+                }
+                className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black"
+              >
+                Register →
+              </motion.button>
+            )}
+
+          </motion.div>
+        </div>
 
       </div>
     </main>

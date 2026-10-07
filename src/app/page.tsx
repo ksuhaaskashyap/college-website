@@ -112,9 +112,17 @@ export default function Home() {
           ...eventDoc.data(),
         })) as EventItem[];
 
-        eventList.sort((a, b) =>
-          a.date.localeCompare(b.date)
-        );
+        eventList.sort((a, b) => {
+          const aTime = Date.parse(
+            `${a.date}T${a.time || "00:00"}:00+05:30`
+          );
+
+          const bTime = Date.parse(
+            `${b.date}T${b.time || "00:00"}:00+05:30`
+          );
+
+          return aTime - bTime;
+        });
 
         setEvents(eventList);
         setLoadingEvents(false);
@@ -614,6 +622,33 @@ export default function Home() {
   function closeMobileMenu() {
     setMobileMenuOpen(false);
   }
+
+  /*
+   * ============================================================
+   * UPCOMING EVENT LAYOUT
+   * ============================================================
+   *
+   * The first future event becomes the large featured event.
+   * Everything else stays underneath as smaller cards.
+   */
+
+  const now = Date.now();
+
+  const upcomingEvents = events.filter((event) => {
+    const timestamp = Date.parse(
+      `${event.date}T${event.time || "00:00"}:00+05:30`
+    );
+
+    return !Number.isNaN(timestamp) && timestamp > now;
+  });
+
+  const featuredEvent = upcomingEvents[0] || null;
+
+  const otherUpcomingEvents = featuredEvent
+    ? upcomingEvents.filter(
+        (event) => event.id !== featuredEvent.id
+      )
+    : [];
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#08080d] text-white">
@@ -1294,7 +1329,7 @@ export default function Home() {
           )}
 
           {!loadingEvents &&
-            events.length === 0 && (
+            upcomingEvents.length === 0 && (
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center">
 
                 <div className="text-5xl">
@@ -1314,7 +1349,7 @@ export default function Home() {
             )}
 
           {!loadingEvents &&
-            events.length > 0 && (
+            featuredEvent && (
               <motion.div
                 initial="hidden"
                 whileInView="visible"
@@ -1322,101 +1357,108 @@ export default function Home() {
                   once: true,
                   amount: 0.1,
                 }}
-                variants={stagger}
-                className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                variants={fadeUp}
               >
 
-                {events.map((event) => (
-                  <motion.article
-                    key={event.id}
-                    variants={fadeUp}
-                    whileHover={{
-                      y: -8,
-                    }}
-                    className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-500 hover:border-white/20 hover:bg-white/[0.07]"
-                  >
+                {/* FEATURED UPCOMING EVENT */}
 
-                    {event.imageUrl ? (
-                      <div className="relative h-56 overflow-hidden">
+                <motion.article
+                  whileHover={{
+                    y: -8,
+                  }}
+                  className="group relative overflow-hidden rounded-[2rem] border border-fuchsia-400/20 bg-white/[0.04] transition duration-500 hover:border-fuchsia-400/40 hover:bg-white/[0.07]"
+                >
+
+                  <div className="grid lg:grid-cols-[1.15fr_1fr]">
+
+                    {/* FEATURED IMAGE */}
+
+                    {featuredEvent.imageUrl ? (
+                      <div className="relative min-h-[320px] overflow-hidden lg:min-h-[430px]">
 
                         <img
-                          src={event.imageUrl}
-                          alt={event.title}
-                          className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                          src={featuredEvent.imageUrl}
+                          alt={featuredEvent.title}
+                          className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                         />
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-black/10 lg:to-[#08080d]/60" />
 
-                        <span className="absolute left-5 top-5 rounded-full bg-black/50 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
-                          {event.category}
+                        <span className="absolute left-6 top-6 rounded-full bg-black/50 px-4 py-2 text-[10px] font-black tracking-widest backdrop-blur">
+                          {featuredEvent.category}
                         </span>
 
                       </div>
                     ) : (
-                      <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20">
+                      <div className="relative flex min-h-[320px] items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20 lg:min-h-[430px]">
 
-                        <div className="absolute h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
+                        <div className="absolute h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
-                        <span className="relative text-7xl transition duration-500 group-hover:scale-125">
-                          {event.category ===
+                        <span className="relative text-9xl transition duration-500 group-hover:scale-110">
+                          {featuredEvent.category ===
                           "Technical"
                             ? "💻"
-                            : event.category ===
+                            : featuredEvent.category ===
                                 "Cultural"
                               ? "🎨"
-                              : event.category ===
+                              : featuredEvent.category ===
                                   "Sports"
                                 ? "🏆"
-                                : event.category ===
+                                : featuredEvent.category ===
                                     "Workshop"
                                   ? "🛠️"
-                                  : event.category ===
+                                  : featuredEvent.category ===
                                       "Competition"
                                     ? "⚡"
-                                    : event.category ===
+                                    : featuredEvent.category ===
                                         "Club"
                                       ? "👥"
                                       : "🎉"}
                         </span>
 
-                        <span className="absolute left-5 top-5 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
-                          {event.category}
+                        <span className="absolute left-6 top-6 rounded-full bg-black/40 px-4 py-2 text-[10px] font-black tracking-widest backdrop-blur">
+                          {featuredEvent.category}
                         </span>
 
                       </div>
                     )}
 
-                    <div className="p-6">
+                    {/* FEATURED DETAILS */}
 
-                      <p className="text-xs font-bold text-fuchsia-400">
-                        {event.date} ·{" "}
-                        {event.time}
+                    <div className="flex flex-col justify-center p-7 md:p-10 lg:p-12">
+
+                      <p className="text-xs font-black tracking-[0.25em] text-fuchsia-400">
+                        NEXT UP
                       </p>
 
-                      <h4 className="mt-3 text-2xl font-black">
-                        {event.title}
+                      <p className="mt-4 text-sm font-bold text-white/40">
+                        {featuredEvent.date} ·{" "}
+                        {featuredEvent.time}
+                      </p>
+
+                      <h4 className="mt-4 text-3xl font-black leading-tight md:text-4xl">
+                        {featuredEvent.title}
                       </h4>
 
-                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/40">
-                        {event.description}
+                      <p className="mt-5 text-base leading-7 text-white/45">
+                        {featuredEvent.description}
                       </p>
 
-                      {/* EVENT COUNTDOWN */}
                       <EventCountdown
-                        date={event.date}
-                        time={event.time}
+                        date={featuredEvent.date}
+                        time={featuredEvent.time}
                         compact
                       />
 
-                      <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
+                      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
 
-                        <span className="text-xs text-white/40">
-                          📍 {event.venue}
+                        <span className="text-sm text-white/40">
+                          📍 {featuredEvent.venue}
                         </span>
 
                         <a
-                          href={`/events/${event.id}`}
-                          className="text-sm font-black transition group-hover:text-fuchsia-400"
+                          href={`/events/${featuredEvent.id}`}
+                          className="rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:scale-105"
                         >
                           View Event →
                         </a>
@@ -1425,8 +1467,147 @@ export default function Home() {
 
                     </div>
 
-                  </motion.article>
-                ))}
+                  </div>
+
+                </motion.article>
+
+                {/* OTHER UPCOMING EVENTS */}
+
+                {otherUpcomingEvents.length > 0 && (
+                  <div className="mt-10">
+
+                    <div className="mb-6 flex items-center justify-between">
+
+                      <div>
+                        <p className="text-xs font-black tracking-[0.25em] text-white/30">
+                          MORE TO COME
+                        </p>
+
+                        <h4 className="mt-2 text-2xl font-black">
+                          More upcoming events.
+                        </h4>
+                      </div>
+
+                    </div>
+
+                    <motion.div
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{
+                        once: true,
+                        amount: 0.1,
+                      }}
+                      variants={stagger}
+                      className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+
+                      {otherUpcomingEvents.map(
+                        (event) => (
+                          <motion.article
+                            key={event.id}
+                            variants={fadeUp}
+                            whileHover={{
+                              y: -8,
+                            }}
+                            className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-500 hover:border-white/20 hover:bg-white/[0.07]"
+                          >
+
+                            {event.imageUrl ? (
+                              <div className="relative h-56 overflow-hidden">
+
+                                <img
+                                  src={event.imageUrl}
+                                  alt={event.title}
+                                  className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                                />
+
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                                <span className="absolute left-5 top-5 rounded-full bg-black/50 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
+                                  {event.category}
+                                </span>
+
+                              </div>
+                            ) : (
+                              <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20">
+
+                                <div className="absolute h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
+
+                                <span className="relative text-7xl transition duration-500 group-hover:scale-125">
+                                  {event.category ===
+                                  "Technical"
+                                    ? "💻"
+                                    : event.category ===
+                                        "Cultural"
+                                      ? "🎨"
+                                      : event.category ===
+                                          "Sports"
+                                        ? "🏆"
+                                        : event.category ===
+                                            "Workshop"
+                                          ? "🛠️"
+                                          : event.category ===
+                                              "Competition"
+                                            ? "⚡"
+                                            : event.category ===
+                                                "Club"
+                                              ? "👥"
+                                              : "🎉"}
+                                </span>
+
+                                <span className="absolute left-5 top-5 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
+                                  {event.category}
+                                </span>
+
+                              </div>
+                            )}
+
+                            <div className="p-6">
+
+                              <p className="text-xs font-bold text-fuchsia-400">
+                                {event.date} ·{" "}
+                                {event.time}
+                              </p>
+
+                              <h4 className="mt-3 text-2xl font-black">
+                                {event.title}
+                              </h4>
+
+                              <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/40">
+                                {event.description}
+                              </p>
+
+                              <EventCountdown
+                                date={event.date}
+                                time={event.time}
+                                compact
+                              />
+
+                              <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
+
+                                <span className="text-xs text-white/40">
+                                  📍 {event.venue}
+                                </span>
+
+                                <a
+                                  href={`/events/${event.id}`}
+                                  className="text-sm font-black transition group-hover:text-fuchsia-400"
+                                >
+                                  View Event →
+                                </a>
+
+                              </div>
+
+                            </div>
+
+                          </motion.article>
+                        )
+                      )}
+
+                    </motion.div>
+
+                  </div>
+                )}
 
               </motion.div>
             )}
