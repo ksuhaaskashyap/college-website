@@ -1,26 +1,215 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Campus Vibe — Sunset After Dark */
+  --background: #171321;
+  --foreground: #fff8f0;
+
+  --cv-bg: #171321;
+  --cv-surface: #211b2d;
+  --cv-surface-2: #2a2238;
+
+  --cv-orange: #ff7a45;
+  --cv-pink: #ff4f81;
+  --cv-yellow: #ffd166;
+  --cv-aqua: #42e8d4;
+  --cv-orchid: #9b6dff;
+  --cv-mint: #8be28b;
+
+  --cv-text: #fff8f0;
+  --cv-muted: #b9afc7;
+  --cv-border: rgba(255, 248, 240, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-cv-bg: var(--cv-bg);
+  --color-cv-surface: var(--cv-surface);
+  --color-cv-surface-2: var(--cv-surface-2);
+
+  --color-cv-orange: var(--cv-orange);
+  --color-cv-pink: var(--cv-pink);
+  --color-cv-yellow: var(--cv-yellow);
+  --color-cv-aqua: var(--cv-aqua);
+  --color-cv-orchid: var(--cv-orchid);
+  --color-cv-mint: var(--cv-mint);
+
+  --color-cv-text: var(--cv-text);
+  --color-cv-muted: var(--cv-muted);
+  --color-cv-border: var(--cv-border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--cv-bg);
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      rgba(255, 122, 69, 0.12),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 90% 10%,
+      rgba(155, 109, 255, 0.12),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      rgba(66, 232, 212, 0.07),
+      transparent 32%
+    ),
+    var(--cv-bg);
+  color: var(--cv-text);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--cv-pink);
+  color: #ffffff;
+}
+
+/* Smooth, colorful scrollbars */
+
+::-webkit-scrollbar {
+  width: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cv-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--cv-orange),
+    var(--cv-pink),
+    var(--cv-orchid)
+  );
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    var(--cv-yellow),
+    var(--cv-orange),
+    var(--cv-pink)
+  );
+}
+
+/* Reusable Campus Vibe surfaces */
+
+.cv-surface {
+  background: rgba(33, 27, 45, 0.78);
+  border: 1px solid var(--cv-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.cv-surface-strong {
+  background: rgba(42, 34, 56, 0.9);
+  border: 1px solid rgba(255, 248, 240, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Colorful Campus Vibe gradients */
+
+.cv-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--cv-orange),
+    var(--cv-pink),
+    var(--cv-orchid)
+  );
+}
+
+.cv-gradient-warm {
+  background: linear-gradient(
+    135deg,
+    var(--cv-yellow),
+    var(--cv-orange),
+    var(--cv-pink)
+  );
+}
+
+.cv-gradient-cool {
+  background: linear-gradient(
+    135deg,
+    var(--cv-aqua),
+    var(--cv-orchid)
+  );
+}
+
+.cv-gradient-text {
+  background: linear-gradient(
+    90deg,
+    var(--cv-yellow),
+    var(--cv-orange),
+    var(--cv-pink),
+    var(--cv-orchid)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft glow utilities */
+
+.cv-glow-orange {
+  box-shadow: 0 0 50px rgba(255, 122, 69, 0.18);
+}
+
+.cv-glow-pink {
+  box-shadow: 0 0 50px rgba(255, 79, 129, 0.18);
+}
+
+.cv-glow-aqua {
+  box-shadow: 0 0 50px rgba(66, 232, 212, 0.15);
+}
+
+.cv-glow-orchid {
+  box-shadow: 0 0 50px rgba(155, 109, 255, 0.18);
+}
+
+/* Better focus states */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--cv-aqua);
+  outline-offset: 3px;
+}
+
+/* Respect reduced-motion preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

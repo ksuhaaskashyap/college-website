@@ -33,26 +33,23 @@ type NotificationItem = {
   message: string;
   type: string;
   published?: boolean;
-
   recipientId?: string;
   actorId?: string;
   postId?: string;
-
   read?: boolean;
-
   createdAt?: any;
 };
 
 const fadeUp: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
+    y: 24,
   },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.6,
+      duration: 0.65,
       ease: "easeOut",
     },
   },
@@ -66,6 +63,72 @@ const stagger: Variants = {
     },
   },
 };
+
+function getCategoryEmoji(category: string) {
+  if (category === "Technical") return "💻";
+  if (category === "Cultural") return "🎨";
+  if (category === "Sports") return "🏆";
+  if (category === "Workshop") return "🛠️";
+  if (category === "Competition") return "⚡";
+  if (category === "Club") return "👥";
+  return "🎉";
+}
+
+function getCategoryStyle(category: string) {
+  if (category === "Technical") {
+    return {
+      text: "text-cyan-300",
+      border: "border-cyan-300/20",
+      bg: "bg-cyan-300/10",
+    };
+  }
+
+  if (category === "Cultural") {
+    return {
+      text: "text-pink-300",
+      border: "border-pink-300/20",
+      bg: "bg-pink-300/10",
+    };
+  }
+
+  if (category === "Sports") {
+    return {
+      text: "text-lime-300",
+      border: "border-lime-300/20",
+      bg: "bg-lime-300/10",
+    };
+  }
+
+  if (category === "Workshop") {
+    return {
+      text: "text-yellow-300",
+      border: "border-yellow-300/20",
+      bg: "bg-yellow-300/10",
+    };
+  }
+
+  if (category === "Competition") {
+    return {
+      text: "text-orange-300",
+      border: "border-orange-300/20",
+      bg: "bg-orange-300/10",
+    };
+  }
+
+  if (category === "Club") {
+    return {
+      text: "text-violet-300",
+      border: "border-violet-300/20",
+      bg: "bg-violet-300/10",
+    };
+  }
+
+  return {
+    text: "text-white",
+    border: "border-white/15",
+    bg: "bg-white/10",
+  };
+}
 
 export default function Home() {
   const router = useRouter();
@@ -82,7 +145,6 @@ export default function Home() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-
   const [userEmail, setUserEmail] = useState("");
 
   const [showNotifications, setShowNotifications] =
@@ -137,7 +199,7 @@ export default function Home() {
   }, []);
 
   // ============================================================
-  // LOAD LOCALLY READ NOTIFICATIONS
+  // LOAD READ NOTIFICATIONS
   // ============================================================
 
   useEffect(() => {
@@ -148,9 +210,7 @@ export default function Home() {
 
     const user = auth.currentUser;
 
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     const storageKey =
       `campus-vibe-read-notifications-${user.uid}`;
@@ -195,10 +255,6 @@ export default function Home() {
     const unsubscribeAuth = onAuthStateChanged(
       auth,
       (user) => {
-        // --------------------------------------------------------
-        // LOGGED OUT
-        // --------------------------------------------------------
-
         if (!user) {
           setIsLoggedIn(false);
           setIsAdmin(false);
@@ -224,24 +280,13 @@ export default function Home() {
           return;
         }
 
-        // --------------------------------------------------------
-        // LOGGED IN
-        // --------------------------------------------------------
-
         setIsLoggedIn(true);
         setUserEmail(user.email || "");
         setLoadingNotifications(true);
 
-        // --------------------------------------------------------
         // ADMIN CHECK
-        // --------------------------------------------------------
-
         try {
-          const adminRef = doc(
-            db,
-            "admins",
-            user.uid
-          );
+          const adminRef = doc(db, "admins", user.uid);
 
           unsubscribeAdmin = onSnapshot(
             adminRef,
@@ -275,10 +320,7 @@ export default function Home() {
           setIsAdmin(false);
         }
 
-        // --------------------------------------------------------
         // GLOBAL NOTIFICATIONS
-        // --------------------------------------------------------
-
         const globalNotificationsQuery = query(
           collection(db, "notifications"),
           where("published", "==", true)
@@ -314,33 +356,25 @@ export default function Home() {
                   NotificationItem
                 >();
 
-                combined.forEach(
-                  (notification) => {
-                    uniqueMap.set(
-                      notification.id,
-                      notification
-                    );
-                  }
-                );
+                combined.forEach((notification) => {
+                  uniqueMap.set(
+                    notification.id,
+                    notification
+                  );
+                });
 
                 const uniqueNotifications =
-                  Array.from(
-                    uniqueMap.values()
-                  );
+                  Array.from(uniqueMap.values());
 
-                uniqueNotifications.sort(
-                  (a, b) => {
-                    const aTime =
-                      a.createdAt?.toMillis?.() ||
-                      0;
+                uniqueNotifications.sort((a, b) => {
+                  const aTime =
+                    a.createdAt?.toMillis?.() || 0;
 
-                    const bTime =
-                      b.createdAt?.toMillis?.() ||
-                      0;
+                  const bTime =
+                    b.createdAt?.toMillis?.() || 0;
 
-                    return bTime - aTime;
-                  }
-                );
+                  return bTime - aTime;
+                });
 
                 return uniqueNotifications;
               });
@@ -357,10 +391,7 @@ export default function Home() {
             }
           );
 
-        // --------------------------------------------------------
         // PERSONAL NOTIFICATIONS
-        // --------------------------------------------------------
-
         const personalNotificationsQuery =
           query(
             collection(db, "notifications"),
@@ -400,33 +431,25 @@ export default function Home() {
                   NotificationItem
                 >();
 
-                combined.forEach(
-                  (notification) => {
-                    uniqueMap.set(
-                      notification.id,
-                      notification
-                    );
-                  }
-                );
+                combined.forEach((notification) => {
+                  uniqueMap.set(
+                    notification.id,
+                    notification
+                  );
+                });
 
                 const uniqueNotifications =
-                  Array.from(
-                    uniqueMap.values()
-                  );
+                  Array.from(uniqueMap.values());
 
-                uniqueNotifications.sort(
-                  (a, b) => {
-                    const aTime =
-                      a.createdAt?.toMillis?.() ||
-                      0;
+                uniqueNotifications.sort((a, b) => {
+                  const aTime =
+                    a.createdAt?.toMillis?.() || 0;
 
-                    const bTime =
-                      b.createdAt?.toMillis?.() ||
-                      0;
+                  const bTime =
+                    b.createdAt?.toMillis?.() || 0;
 
-                    return bTime - aTime;
-                  }
-                );
+                  return bTime - aTime;
+                });
 
                 return uniqueNotifications;
               });
@@ -461,7 +484,7 @@ export default function Home() {
   }, []);
 
   // ============================================================
-  // NOTIFICATION HELPERS
+  // NOTIFICATIONS
   // ============================================================
 
   function isNotificationRead(
@@ -469,9 +492,7 @@ export default function Home() {
   ) {
     return (
       notification.read === true ||
-      readNotificationIds.includes(
-        notification.id
-      )
+      readNotificationIds.includes(notification.id)
     );
   }
 
@@ -480,10 +501,6 @@ export default function Home() {
       (notification) =>
         !isNotificationRead(notification)
     );
-
-  // ============================================================
-  // MARK NOTIFICATION AS READ
-  // ============================================================
 
   function markNotificationAsRead(
     notificationId: string
@@ -498,9 +515,7 @@ export default function Home() {
 
     const user = auth.currentUser;
 
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     const nextReadIds = [
       ...readNotificationIds,
@@ -521,10 +536,6 @@ export default function Home() {
       );
     }
   }
-
-  // ============================================================
-  // MARK ALL NOTIFICATIONS AS READ
-  // ============================================================
 
   function markAllNotificationsAsRead() {
     const user = auth.currentUser;
@@ -556,36 +567,13 @@ export default function Home() {
     }
   }
 
-  // ============================================================
-  // NOTIFICATION ICON
-  // ============================================================
-
-  function getNotificationIcon(
-    type: string
-  ) {
-    if (type === "event") {
-      return "🎉";
-    }
-
-    if (type === "reminder") {
-      return "⏰";
-    }
-
-    if (type === "announcement") {
-      return "📢";
-    }
-
-    if (type === "like") {
-      return "❤️";
-    }
-
-    if (type === "comment") {
-      return "💬";
-    }
-
-    if (type === "poll") {
-      return "🗳️";
-    }
+  function getNotificationIcon(type: string) {
+    if (type === "event") return "🎉";
+    if (type === "reminder") return "⏰";
+    if (type === "announcement") return "📢";
+    if (type === "like") return "❤️";
+    if (type === "comment") return "💬";
+    if (type === "poll") return "🗳️";
 
     return "🔔";
   }
@@ -615,22 +603,13 @@ export default function Home() {
     }
   }
 
-  // ============================================================
-  // CLOSE MOBILE MENU
-  // ============================================================
-
   function closeMobileMenu() {
     setMobileMenuOpen(false);
   }
 
-  /*
-   * ============================================================
-   * UPCOMING EVENT LAYOUT
-   * ============================================================
-   *
-   * The first future event becomes the large featured event.
-   * Everything else stays underneath as smaller cards.
-   */
+  // ============================================================
+  // UPCOMING EVENTS
+  // ============================================================
 
   const now = Date.now();
 
@@ -639,29 +618,58 @@ export default function Home() {
       `${event.date}T${event.time || "00:00"}:00+05:30`
     );
 
-    return !Number.isNaN(timestamp) && timestamp > now;
+    return (
+      !Number.isNaN(timestamp) &&
+      timestamp > now
+    );
   });
 
-  const featuredEvent = upcomingEvents[0] || null;
+  const featuredEvent =
+    upcomingEvents[0] || null;
 
-  const otherUpcomingEvents = featuredEvent
-    ? upcomingEvents.filter(
-        (event) => event.id !== featuredEvent.id
-      )
-    : [];
+  const otherUpcomingEvents =
+    featuredEvent
+      ? upcomingEvents.filter(
+          (event) =>
+            event.id !== featuredEvent.id
+        )
+      : [];
+
+  const featuredCategoryStyle =
+    featuredEvent
+      ? getCategoryStyle(
+          featuredEvent.category
+        )
+      : null;
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#08080d] text-white">
+    <main className="min-h-screen overflow-hidden bg-[#171321] text-[#fff8f0]">
 
-      {/* ========================================================
-          DESKTOP / MOBILE NAVBAR
-      ======================================================== */}
+      {/* ======================================================
+          GLOBAL DECORATIVE BACKGROUND
+      ====================================================== */}
 
-      <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#08080d]/75 backdrop-blur-xl">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+
+        <div className="absolute -left-40 top-0 h-[520px] w-[520px] rounded-full bg-orange-500/15 blur-[140px]" />
+
+        <div className="absolute right-[-180px] top-[10%] h-[500px] w-[500px] rounded-full bg-pink-500/15 blur-[150px]" />
+
+        <div className="absolute left-[35%] top-[45%] h-[420px] w-[420px] rounded-full bg-violet-500/10 blur-[150px]" />
+
+        <div className="absolute bottom-[-200px] right-[15%] h-[500px] w-[500px] rounded-full bg-cyan-400/10 blur-[160px]" />
+
+      </div>
+
+      {/* ======================================================
+          NAVBAR
+      ====================================================== */}
+
+      <nav className="fixed top-0 z-50 w-full border-b border-white/[0.08] bg-[#171321]/75 backdrop-blur-2xl">
 
         <div className="mx-auto max-w-7xl px-5 md:px-8">
 
-          <div className="flex min-h-[72px] items-center justify-between">
+          <div className="flex min-h-[74px] items-center justify-between">
 
             {/* BRAND */}
 
@@ -670,41 +678,51 @@ export default function Home() {
                 router.push("/");
                 closeMobileMenu();
               }}
-              className="text-left"
+              className="group text-left"
             >
-              <h1 className="text-xl font-black tracking-tight">
-                SREENIDHI
-                <span className="text-fuchsia-400">
-                  .
-                </span>
-              </h1>
+              <div className="flex items-center gap-2">
 
-              <p className="text-[9px] font-bold tracking-[0.35em] text-white/40">
-                CAMPUS VIBE
-              </p>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500 text-sm font-black shadow-[0_0_25px_rgba(255,79,129,0.25)] transition duration-300 group-hover:rotate-6">
+                  ⚡
+                </div>
+
+                <div>
+                  <h1 className="text-lg font-black tracking-tight">
+                    SREENIDHI
+                    <span className="text-orange-400">
+                      .
+                    </span>
+                  </h1>
+
+                  <p className="text-[8px] font-bold tracking-[0.35em] text-white/35">
+                    CAMPUS VIBE
+                  </p>
+                </div>
+
+              </div>
             </button>
 
             {/* DESKTOP NAV */}
 
-            <div className="hidden items-center gap-4 md:flex">
+            <div className="hidden items-center gap-2 md:flex">
 
               <a
                 href="#events"
-                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-white/55 transition hover:bg-white/5 hover:text-white"
               >
                 Events
               </a>
 
               <a
                 href="#clubs"
-                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-white/55 transition hover:bg-white/5 hover:text-white"
               >
                 Clubs
               </a>
 
               <a
                 href="#about"
-                className="px-2 text-sm font-medium text-white/60 transition hover:text-white"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-white/55 transition hover:bg-white/5 hover:text-white"
               >
                 About
               </a>
@@ -713,7 +731,7 @@ export default function Home() {
                 onClick={() =>
                   router.push("/community")
                 }
-                className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-bold text-cyan-300 transition hover:scale-105 hover:bg-cyan-400/20"
+                className="ml-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-200 transition hover:scale-105 hover:bg-cyan-300/15"
               >
                 👥 Community
               </button>
@@ -723,7 +741,7 @@ export default function Home() {
                   onClick={() =>
                     router.push("/admin")
                   }
-                  className="rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2 text-sm font-bold text-fuchsia-300 transition hover:bg-fuchsia-500/20"
+                  className="rounded-full border border-orange-300/20 bg-orange-300/10 px-4 py-2 text-sm font-bold text-orange-200 transition hover:scale-105 hover:bg-orange-300/15"
                 >
                   🛠️ Admin
                 </button>
@@ -736,13 +754,17 @@ export default function Home() {
                       !showNotifications
                     )
                   }
-                  className="relative rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"
+                  className="relative ml-1 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"
                 >
-                  🔔 Notifications
+                  🔔
+
+                  <span className="ml-2">
+                    Notifications
+                  </span>
 
                   {unreadNotifications.length >
                     0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black">
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-pink-500 px-1 text-[10px] font-black shadow-lg shadow-pink-500/30">
                       {unreadNotifications.length >
                       9
                         ? "9+"
@@ -755,7 +777,7 @@ export default function Home() {
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}
-                  className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:scale-105"
+                  className="ml-1 rounded-full bg-[#fff8f0] px-5 py-2.5 text-sm font-black text-[#171321] transition hover:scale-105"
                 >
                   Logout
                 </button>
@@ -764,7 +786,7 @@ export default function Home() {
                   onClick={() =>
                     router.push("/auth")
                   }
-                  className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:scale-105"
+                  className="ml-1 rounded-full bg-[#fff8f0] px-5 py-2.5 text-sm font-black text-[#171321] transition hover:scale-105"
                 >
                   Login
                 </button>
@@ -772,7 +794,7 @@ export default function Home() {
 
             </div>
 
-            {/* MOBILE BUTTONS */}
+            {/* MOBILE */}
 
             <div className="flex items-center gap-2 md:hidden">
 
@@ -789,7 +811,7 @@ export default function Home() {
 
                   {unreadNotifications.length >
                     0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-black">
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-pink-500 px-1 text-[10px] font-black">
                       {unreadNotifications.length >
                       9
                         ? "9+"
@@ -828,10 +850,6 @@ export default function Home() {
                 opacity: 1,
                 height: "auto",
               }}
-              exit={{
-                opacity: 0,
-                height: 0,
-              }}
               className="border-t border-white/10 py-4 md:hidden"
             >
 
@@ -839,30 +857,24 @@ export default function Home() {
 
                 <a
                   href="#events"
-                  onClick={
-                    closeMobileMenu
-                  }
-                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                  onClick={closeMobileMenu}
+                  className="flex min-h-12 items-center rounded-2xl bg-white/[0.04] px-4 font-bold"
                 >
                   🎉 Events
                 </a>
 
                 <a
                   href="#clubs"
-                  onClick={
-                    closeMobileMenu
-                  }
-                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                  onClick={closeMobileMenu}
+                  className="flex min-h-12 items-center rounded-2xl bg-white/[0.04] px-4 font-bold"
                 >
                   👥 Clubs
                 </a>
 
                 <a
                   href="#about"
-                  onClick={
-                    closeMobileMenu
-                  }
-                  className="flex min-h-12 items-center rounded-xl bg-white/[0.04] px-4 font-bold"
+                  onClick={closeMobileMenu}
+                  className="flex min-h-12 items-center rounded-2xl bg-white/[0.04] px-4 font-bold"
                 >
                   ℹ️ About
                 </a>
@@ -870,11 +882,9 @@ export default function Home() {
                 <button
                   onClick={() => {
                     closeMobileMenu();
-                    router.push(
-                      "/community"
-                    );
+                    router.push("/community");
                   }}
-                  className="flex min-h-12 items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 text-left font-bold text-cyan-300"
+                  className="flex min-h-12 items-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-left font-bold text-cyan-200"
                 >
                   👥 Community
                 </button>
@@ -883,11 +893,9 @@ export default function Home() {
                   <button
                     onClick={() => {
                       closeMobileMenu();
-                      router.push(
-                        "/admin"
-                      );
+                      router.push("/admin");
                     }}
-                    className="flex min-h-12 items-center rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 text-left font-bold text-fuchsia-300"
+                    className="flex min-h-12 items-center rounded-2xl border border-orange-300/20 bg-orange-300/10 px-4 text-left font-bold text-orange-200"
                   >
                     🛠️ Admin Dashboard
                   </button>
@@ -895,10 +903,8 @@ export default function Home() {
 
                 {isLoggedIn ? (
                   <button
-                    onClick={
-                      handleLogout
-                    }
-                    className="flex min-h-12 items-center rounded-xl bg-white px-4 text-left font-black text-black"
+                    onClick={handleLogout}
+                    className="flex min-h-12 items-center rounded-2xl bg-[#fff8f0] px-4 text-left font-black text-[#171321]"
                   >
                     🚪 Logout
                   </button>
@@ -906,11 +912,9 @@ export default function Home() {
                   <button
                     onClick={() => {
                       closeMobileMenu();
-                      router.push(
-                        "/auth"
-                      );
+                      router.push("/auth");
                     }}
-                    className="flex min-h-12 items-center rounded-xl bg-white px-4 text-left font-black text-black"
+                    className="flex min-h-12 items-center rounded-2xl bg-[#fff8f0] px-4 text-left font-black text-[#171321]"
                   >
                     🔐 Login
                   </button>
@@ -930,12 +934,11 @@ export default function Home() {
           )}
 
         </div>
-
       </nav>
 
-      {/* ========================================================
-          NOTIFICATIONS POPUP
-      ======================================================== */}
+      {/* ======================================================
+          NOTIFICATIONS
+      ====================================================== */}
 
       {showNotifications && (
         <motion.div
@@ -949,21 +952,21 @@ export default function Home() {
             y: 0,
             scale: 1,
           }}
-          className="fixed right-4 top-20 z-[70] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-white/10 bg-[#15151d]/95 p-5 shadow-2xl backdrop-blur-xl md:right-8"
+          className="fixed right-4 top-20 z-[70] w-[calc(100%-2rem)] max-w-sm overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#211b2d]/95 p-5 shadow-2xl backdrop-blur-2xl md:right-8"
         >
 
-          <div className="flex items-start justify-between">
+          <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-pink-500/10 blur-3xl" />
+
+          <div className="relative flex items-start justify-between">
 
             <div>
-              <p className="font-bold">
+              <p className="font-black">
                 🔔 Notifications
               </p>
 
-              {notifications.length >
-                0 && (
-                <p className="mt-1 text-xs text-white/30">
-                  {unreadNotifications.length >
-                  0
+              {notifications.length > 0 && (
+                <p className="mt-1 text-xs text-white/35">
+                  {unreadNotifications.length > 0
                     ? `${unreadNotifications.length} unread`
                     : "All caught up"}
                 </p>
@@ -978,7 +981,7 @@ export default function Home() {
                   onClick={
                     markAllNotificationsAsRead
                   }
-                  className="text-[10px] font-black uppercase tracking-wider text-cyan-400 transition hover:text-cyan-300"
+                  className="text-[10px] font-black uppercase tracking-wider text-cyan-300"
                 >
                   Mark all read
                 </button>
@@ -986,22 +989,18 @@ export default function Home() {
 
               <button
                 onClick={() =>
-                  setShowNotifications(
-                    false
-                  )
+                  setShowNotifications(false)
                 }
-                className="text-white/40 hover:text-white"
+                className="text-white/40 transition hover:text-white"
               >
                 ✕
               </button>
 
             </div>
-
           </div>
 
           {loadingNotifications ? (
             <div className="py-10 text-center">
-
               <div className="text-3xl">
                 ⚡
               </div>
@@ -1009,10 +1008,8 @@ export default function Home() {
               <p className="mt-3 text-sm text-white/40">
                 Loading notifications...
               </p>
-
             </div>
-          ) : notifications.length ===
-            0 ? (
+          ) : notifications.length === 0 ? (
             <div className="py-10 text-center">
 
               <div className="text-4xl">
@@ -1041,9 +1038,7 @@ export default function Home() {
 
                   return (
                     <button
-                      key={
-                        notification.id
-                      }
+                      key={notification.id}
                       onClick={() =>
                         markNotificationAsRead(
                           notification.id
@@ -1052,22 +1047,20 @@ export default function Home() {
                       className={`w-full rounded-2xl border p-4 text-left transition ${
                         isRead
                           ? "border-white/10 bg-white/[0.02]"
-                          : "border-fuchsia-400/20 bg-fuchsia-500/[0.06] hover:bg-fuchsia-500/[0.1]"
+                          : "border-pink-400/20 bg-pink-400/[0.07] hover:bg-pink-400/[0.12]"
                       }`}
                     >
 
                       <div className="flex gap-3">
 
                         <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
-
                           {getNotificationIcon(
                             notification.type
                           )}
 
                           {!isRead && (
-                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-fuchsia-400" />
+                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-pink-400" />
                           )}
-
                         </div>
 
                         <div className="min-w-0">
@@ -1081,7 +1074,7 @@ export default function Home() {
                             </p>
 
                             {!isRead && (
-                              <span className="mt-1 shrink-0 text-[9px] font-black uppercase tracking-wider text-fuchsia-400">
+                              <span className="mt-1 shrink-0 text-[9px] font-black uppercase tracking-wider text-pink-400">
                                 New
                               </span>
                             )}
@@ -1096,8 +1089,7 @@ export default function Home() {
 
                           {notification.createdAt && (
                             <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-white/20">
-                              {notification
-                                .createdAt
+                              {notification.createdAt
                                 ?.toDate
                                 ? notification.createdAt
                                     .toDate()
@@ -1121,170 +1113,230 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* ========================================================
+      {/* ======================================================
           HERO
-      ======================================================== */}
+      ====================================================== */}
 
-      <motion.section
-        initial="hidden"
-        animate="visible"
-        variants={stagger}
-        className="relative flex min-h-screen items-center px-6 pt-28 md:px-12"
-      >
+      <section className="relative z-10 flex min-h-screen items-center px-6 pb-20 pt-32 md:px-12 md:pt-28">
 
-        <div className="absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-fuchsia-600/20 blur-[120px]" />
+        {/* FLOATING DECOR */}
 
-        <div className="absolute right-0 top-20 h-80 w-80 rounded-full bg-cyan-500/10 blur-[120px]" />
+        <motion.div
+          animate={{
+            y: [0, -18, 0],
+            rotate: [0, 5, 0],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute right-[9%] top-[24%] hidden h-20 w-20 rotate-12 rounded-[1.5rem] border border-yellow-300/20 bg-yellow-300/10 backdrop-blur-xl md:block"
+        >
+          <div className="flex h-full items-center justify-center text-3xl">
+            ✦
+          </div>
+        </motion.div>
 
-        <div className="relative mx-auto w-full max-w-7xl">
+        <motion.div
+          animate={{
+            y: [0, 15, 0],
+            rotate: [0, -7, 0],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute bottom-[25%] right-[20%] hidden h-14 w-14 rounded-full border border-cyan-300/20 bg-cyan-300/10 backdrop-blur-xl md:block"
+        />
 
-          <motion.div
-            variants={fadeUp}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/70 backdrop-blur"
-          >
-            <span className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
-            CAMPUS IS ALIVE
-          </motion.div>
-
-          <motion.h2
-            variants={fadeUp}
-            className="max-w-5xl text-6xl font-black leading-[0.9] tracking-[-0.06em] sm:text-7xl md:text-9xl"
-          >
-            YOUR CAMPUS.
-            <br />
-
-            <span className="bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-              YOUR VIBE.
-            </span>
-          </motion.h2>
-
-          <motion.p
-            variants={fadeUp}
-            className="mt-8 max-w-2xl text-lg leading-relaxed text-white/50 md:text-xl"
-          >
-            Discover everything happening at
-            Sreenidhi University — events,
-            clubs, competitions, concerts,
-            workshops and moments you don't
-            want to miss.
-          </motion.p>
+        <div className="mx-auto w-full max-w-7xl">
 
           <motion.div
-            variants={fadeUp}
-            className="mt-10 flex flex-wrap gap-4"
+            initial="hidden"
+            animate="visible"
+            variants={stagger}
           >
 
-            <a
-              href="#events"
-              className="rounded-full bg-white px-7 py-4 text-sm font-black text-black transition hover:scale-105"
+            <motion.div
+              variants={fadeUp}
+              className="mb-7 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.045] px-4 py-2 backdrop-blur-xl"
             >
-              Explore Events →
-            </a>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-lime-400" />
+              </span>
 
-            <button
-              onClick={() =>
-                router.push(
-                  "/community"
-                )
-              }
-              className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-7 py-4 text-sm font-bold text-cyan-300 backdrop-blur transition hover:scale-105 hover:bg-cyan-400/20"
+              <span className="text-[10px] font-black tracking-[0.2em] text-white/65">
+                CAMPUS IS ALIVE
+              </span>
+
+              <span className="text-xs text-white/25">
+                ✦
+              </span>
+
+              <span className="text-[10px] font-bold text-orange-300">
+                2026
+              </span>
+            </motion.div>
+
+            <motion.h2
+              variants={fadeUp}
+              className="max-w-6xl text-[4rem] font-black leading-[0.86] tracking-[-0.075em] sm:text-7xl md:text-[9rem]"
             >
-              👥 Community →
-            </button>
+              YOUR
+              <br />
 
-            <button
-              onClick={() =>
-                setShowNotifications(
-                  true
-                )
-              }
-              className="rounded-full border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold backdrop-blur transition hover:bg-white/10"
+              <span className="bg-gradient-to-r from-orange-300 via-pink-400 to-violet-400 bg-clip-text text-transparent">
+                CAMPUS.
+              </span>
+
+              <br />
+
+              <span className="text-[#fff8f0]">
+                YOUR VIBE.
+              </span>
+            </motion.h2>
+
+            <motion.p
+              variants={fadeUp}
+              className="mt-9 max-w-2xl text-base leading-7 text-white/45 md:text-xl md:leading-8"
             >
-              ✨ What's happening?
-            </button>
+              Discover what's happening at
+              Sreenidhi University — events,
+              clubs, competitions, concerts,
+              workshops and all the moments
+              worth showing up for.
+            </motion.p>
 
-          </motion.div>
+            <motion.div
+              variants={fadeUp}
+              className="mt-9 flex flex-wrap gap-3"
+            >
 
-          <motion.div
-            variants={fadeUp}
-            className="mt-16 grid max-w-3xl grid-cols-3 gap-4 border-t border-white/10 pt-8"
-          >
+              <a
+                href="#events"
+                className="group rounded-full bg-[#fff8f0] px-7 py-4 text-sm font-black text-[#171321] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(255,248,240,0.15)]"
+              >
+                Explore Events
+                <span className="ml-2 transition group-hover:ml-3">
+                  →
+                </span>
+              </a>
 
-            <div>
-              <p className="text-3xl font-black">
-                {events.length}
-              </p>
+              <button
+                onClick={() =>
+                  router.push("/community")
+                }
+                className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-7 py-4 text-sm font-bold text-cyan-100 backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-cyan-300/15"
+              >
+                👥 Join Community
+              </button>
 
-              <p className="mt-1 text-xs text-white/40">
-                Upcoming events
-              </p>
-            </div>
+              <button
+                onClick={() =>
+                  setShowNotifications(true)
+                }
+                className="rounded-full border border-white/10 bg-white/[0.04] px-7 py-4 text-sm font-bold text-white/75 backdrop-blur-xl transition hover:bg-white/[0.08]"
+              >
+                ✨ What's happening?
+              </button>
 
-            <div>
-              <p className="text-3xl font-black">
-                10
-              </p>
+            </motion.div>
 
-              <p className="mt-1 text-xs text-white/40">
-                Active clubs
-              </p>
-            </div>
+            {/* STATS */}
 
-            <div>
-              <p className="text-3xl font-black">
-                2.4K+
-              </p>
+            <motion.div
+              variants={fadeUp}
+              className="mt-14 flex max-w-3xl flex-wrap gap-8 border-t border-white/10 pt-7"
+            >
 
-              <p className="mt-1 text-xs text-white/40">
-                Students vibing
-              </p>
-            </div>
+              <div>
+                <p className="text-3xl font-black">
+                  {events.length}
+                </p>
+
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
+                  Events
+                </p>
+              </div>
+
+              <div className="h-12 w-px bg-white/10" />
+
+              <div>
+                <p className="text-3xl font-black text-orange-300">
+                  10
+                </p>
+
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
+                  Active clubs
+                </p>
+              </div>
+
+              <div className="h-12 w-px bg-white/10" />
+
+              <div>
+                <p className="text-3xl font-black text-pink-300">
+                  2.4K+
+                </p>
+
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
+                  Students vibing
+                </p>
+              </div>
+
+            </motion.div>
 
           </motion.div>
 
         </div>
+      </section>
 
-      </motion.section>
+      {/* ======================================================
+          LIVE STRIP
+      ====================================================== */}
 
-      {/* ========================================================
-          LIVE
-      ======================================================== */}
-
-      <section className="border-y border-white/10 bg-white/[0.02] px-6 py-8 md:px-12">
+      <section className="relative z-10 border-y border-white/[0.08] bg-gradient-to-r from-orange-400/[0.07] via-pink-400/[0.05] to-cyan-400/[0.07] px-6 py-7 md:px-12">
 
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 md:flex-row md:items-center">
 
-          <div>
+          <div className="flex items-center gap-4">
 
-            <div className="mb-2 flex items-center gap-2 text-xs font-black tracking-widest text-red-400">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              LIVE ON CAMPUS
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-red-400/20 bg-red-400/10">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.8)]" />
             </div>
 
-            <h3 className="text-2xl font-black">
-              Something is happening right now.
-            </h3>
+            <div>
+              <p className="text-[10px] font-black tracking-[0.25em] text-red-300">
+                LIVE ON CAMPUS
+              </p>
+
+              <h3 className="mt-1 text-lg font-black md:text-xl">
+                Something is happening right now.
+              </h3>
+            </div>
 
           </div>
 
           <a
             href="#events"
-            className="rounded-full border border-white/10 px-6 py-3 text-sm font-bold transition hover:bg-white/10"
+            className="w-fit rounded-full border border-white/10 bg-white/[0.03] px-6 py-3 text-sm font-bold transition hover:bg-white/[0.08]"
           >
-            See Live Events →
+            See Events →
           </a>
 
         </div>
 
       </section>
 
-      {/* ========================================================
+      {/* ======================================================
           EVENTS
-      ======================================================== */}
+      ====================================================== */}
 
       <section
         id="events"
-        className="px-6 py-24 md:px-12"
+        className="relative z-10 px-6 py-24 md:px-12"
       >
 
         <div className="mx-auto max-w-7xl">
@@ -1297,25 +1349,51 @@ export default function Home() {
               amount: 0.2,
             }}
             variants={fadeUp}
-            className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"
+            className="mb-12"
           >
 
-            <div>
+            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
 
-              <p className="mb-3 text-sm font-black tracking-[0.25em] text-fuchsia-400">
-                DON'T MISS OUT
-              </p>
+              <div>
 
-              <h3 className="text-5xl font-black tracking-tight md:text-6xl">
-                Upcoming events.
-              </h3>
+                <div className="mb-4 flex items-center gap-3">
+
+                  <span className="h-px w-8 bg-orange-400" />
+
+                  <p className="text-[10px] font-black tracking-[0.3em] text-orange-300">
+                    DON'T MISS OUT
+                  </p>
+
+                </div>
+
+                <h3 className="text-5xl font-black tracking-[-0.04em] md:text-7xl">
+                  What's
+                  <span className="text-pink-300">
+                    {" "}
+                    happening?
+                  </span>
+                </h3>
+
+              </div>
+
+              {featuredEvent && (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
+                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">
+                    Next up
+                  </p>
+
+                  <p className="mt-1 max-w-[220px] truncate text-sm font-bold">
+                    {featuredEvent.title}
+                  </p>
+                </div>
+              )}
 
             </div>
 
           </motion.div>
 
           {loadingEvents && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center">
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-16 text-center">
 
               <div className="text-4xl">
                 ⚡
@@ -1330,13 +1408,13 @@ export default function Home() {
 
           {!loadingEvents &&
             upcomingEvents.length === 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center">
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-16 text-center">
 
-                <div className="text-5xl">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-orange-300/20 bg-orange-300/10 text-4xl">
                   📅
                 </div>
 
-                <h4 className="mt-5 text-2xl font-black">
+                <h4 className="mt-6 text-2xl font-black">
                   Nothing scheduled yet
                 </h4>
 
@@ -1347,6 +1425,8 @@ export default function Home() {
 
               </div>
             )}
+
+          {/* FEATURED EVENT */}
 
           {!loadingEvents &&
             featuredEvent && (
@@ -1360,97 +1440,112 @@ export default function Home() {
                 variants={fadeUp}
               >
 
-                {/* FEATURED UPCOMING EVENT */}
-
                 <motion.article
                   whileHover={{
                     y: -8,
                   }}
-                  className="group relative overflow-hidden rounded-[2rem] border border-fuchsia-400/20 bg-white/[0.04] transition duration-500 hover:border-fuchsia-400/40 hover:bg-white/[0.07]"
+                  className="group relative overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#211b2d]/80 shadow-2xl shadow-black/20 transition duration-500 hover:border-pink-300/25"
                 >
 
-                  <div className="grid lg:grid-cols-[1.15fr_1fr]">
+                  {/* TOP COLOR LINE */}
 
-                    {/* FEATURED IMAGE */}
+                  <div className="absolute left-0 right-0 top-0 z-20 h-1 bg-gradient-to-r from-orange-400 via-pink-400 to-violet-400" />
+
+                  <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
+
+                    {/* IMAGE */}
 
                     {featuredEvent.imageUrl ? (
-                      <div className="relative min-h-[320px] overflow-hidden lg:min-h-[430px]">
+                      <div className="relative min-h-[360px] overflow-hidden lg:min-h-[500px]">
 
                         <img
                           src={featuredEvent.imageUrl}
                           alt={featuredEvent.title}
-                          className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                          className="h-full w-full object-cover transition duration-1000 group-hover:scale-105"
                         />
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-black/10 lg:to-[#08080d]/60" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#171321] via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-transparent lg:to-[#211b2d]" />
 
-                        <span className="absolute left-6 top-6 rounded-full bg-black/50 px-4 py-2 text-[10px] font-black tracking-widest backdrop-blur">
-                          {featuredEvent.category}
-                        </span>
+                        <div className="absolute left-6 top-7 flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-2 backdrop-blur-xl">
+
+                          <span className="h-2 w-2 rounded-full bg-orange-300" />
+
+                          <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                            Featured
+                          </span>
+
+                        </div>
 
                       </div>
                     ) : (
-                      <div className="relative flex min-h-[320px] items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20 lg:min-h-[430px]">
+                      <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden bg-gradient-to-br from-orange-400/20 via-pink-500/10 to-violet-500/20 lg:min-h-[500px]">
 
-                        <div className="absolute h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
+                        <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-pink-500/20 blur-[100px]" />
 
-                        <span className="relative text-9xl transition duration-500 group-hover:scale-110">
-                          {featuredEvent.category ===
-                          "Technical"
-                            ? "💻"
-                            : featuredEvent.category ===
-                                "Cultural"
-                              ? "🎨"
-                              : featuredEvent.category ===
-                                  "Sports"
-                                ? "🏆"
-                                : featuredEvent.category ===
-                                    "Workshop"
-                                  ? "🛠️"
-                                  : featuredEvent.category ===
-                                      "Competition"
-                                    ? "⚡"
-                                    : featuredEvent.category ===
-                                        "Club"
-                                      ? "👥"
-                                      : "🎉"}
+                        <div className="absolute left-8 top-8 h-24 w-24 rounded-full border border-orange-300/20 bg-orange-300/10 blur-sm" />
+
+                        <span className="relative text-[8rem] drop-shadow-2xl transition duration-500 group-hover:scale-110">
+                          {getCategoryEmoji(
+                            featuredEvent.category
+                          )}
                         </span>
 
-                        <span className="absolute left-6 top-6 rounded-full bg-black/40 px-4 py-2 text-[10px] font-black tracking-widest backdrop-blur">
-                          {featuredEvent.category}
-                        </span>
+                        <div className="absolute left-6 top-7 flex items-center gap-2 rounded-full border border-white/15 bg-black/25 px-4 py-2 backdrop-blur-xl">
+
+                          <span className="h-2 w-2 rounded-full bg-orange-300" />
+
+                          <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                            Featured
+                          </span>
+
+                        </div>
 
                       </div>
                     )}
 
-                    {/* FEATURED DETAILS */}
+                    {/* DETAILS */}
 
-                    <div className="flex flex-col justify-center p-7 md:p-10 lg:p-12">
+                    <div className="relative flex flex-col justify-center p-7 md:p-10 lg:p-12">
 
-                      <p className="text-xs font-black tracking-[0.25em] text-fuchsia-400">
-                        NEXT UP
+                      <div className="absolute right-8 top-8 text-5xl text-white/[0.035]">
+                        ✦
+                      </div>
+
+                      {featuredCategoryStyle && (
+                        <span
+                          className={`w-fit rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] ${featuredCategoryStyle.border} ${featuredCategoryStyle.bg} ${featuredCategoryStyle.text}`}
+                        >
+                          {featuredEvent.category}
+                        </span>
+                      )}
+
+                      <p className="mt-5 text-[10px] font-black uppercase tracking-[0.25em] text-orange-300">
+                        Next on campus
                       </p>
 
-                      <p className="mt-4 text-sm font-bold text-white/40">
-                        {featuredEvent.date} ·{" "}
+                      <p className="mt-3 text-sm font-bold text-white/35">
+                        {featuredEvent.date}
+                        {" · "}
                         {featuredEvent.time}
                       </p>
 
-                      <h4 className="mt-4 text-3xl font-black leading-tight md:text-4xl">
+                      <h4 className="mt-4 text-4xl font-black leading-[0.98] tracking-[-0.035em] md:text-5xl">
                         {featuredEvent.title}
                       </h4>
 
-                      <p className="mt-5 text-base leading-7 text-white/45">
+                      <p className="mt-5 text-sm leading-7 text-white/45 md:text-base">
                         {featuredEvent.description}
                       </p>
 
-                      <EventCountdown
-                        date={featuredEvent.date}
-                        time={featuredEvent.time}
-                        compact
-                      />
+                      <div className="mt-6">
+                        <EventCountdown
+                          date={featuredEvent.date}
+                          time={featuredEvent.time}
+                          compact
+                        />
+                      </div>
 
-                      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
+                      <div className="mt-8 flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
 
                         <span className="text-sm text-white/40">
                           📍 {featuredEvent.venue}
@@ -1458,9 +1553,12 @@ export default function Home() {
 
                         <a
                           href={`/events/${featuredEvent.id}`}
-                          className="rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:scale-105"
+                          className="group/button rounded-full bg-[#fff8f0] px-6 py-3 text-center text-sm font-black text-[#171321] transition hover:-translate-y-1"
                         >
-                          View Event →
+                          View Event
+                          <span className="ml-2 transition group-hover/button:ml-3">
+                            →
+                          </span>
                         </a>
 
                       </div>
@@ -1471,22 +1569,26 @@ export default function Home() {
 
                 </motion.article>
 
-                {/* OTHER UPCOMING EVENTS */}
+                {/* OTHER EVENTS */}
 
                 {otherUpcomingEvents.length > 0 && (
-                  <div className="mt-10">
+                  <div className="mt-16">
 
-                    <div className="mb-6 flex items-center justify-between">
+                    <div className="mb-7 flex items-end justify-between">
 
                       <div>
-                        <p className="text-xs font-black tracking-[0.25em] text-white/30">
-                          MORE TO COME
+                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/25">
+                          KEEP SCROLLING
                         </p>
 
-                        <h4 className="mt-2 text-2xl font-black">
-                          More upcoming events.
+                        <h4 className="mt-2 text-3xl font-black">
+                          More events.
                         </h4>
                       </div>
+
+                      <span className="hidden text-xs font-bold text-white/25 sm:block">
+                        {otherUpcomingEvents.length} more
+                      </span>
 
                     </div>
 
@@ -1502,110 +1604,105 @@ export default function Home() {
                     >
 
                       {otherUpcomingEvents.map(
-                        (event) => (
-                          <motion.article
-                            key={event.id}
-                            variants={fadeUp}
-                            whileHover={{
-                              y: -8,
-                            }}
-                            className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-500 hover:border-white/20 hover:bg-white/[0.07]"
-                          >
+                        (event) => {
+                          const categoryStyle =
+                            getCategoryStyle(
+                              event.category
+                            );
 
-                            {event.imageUrl ? (
-                              <div className="relative h-56 overflow-hidden">
+                          return (
+                            <motion.article
+                              key={event.id}
+                              variants={fadeUp}
+                              whileHover={{
+                                y: -7,
+                              }}
+                              className="group relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#211b2d]/75 transition duration-500 hover:border-white/20"
+                            >
 
-                                <img
-                                  src={event.imageUrl}
-                                  alt={event.title}
-                                  className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                              {event.imageUrl ? (
+                                <div className="relative h-56 overflow-hidden">
+
+                                  <img
+                                    src={event.imageUrl}
+                                    alt={event.title}
+                                    className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                                  />
+
+                                  <div className="absolute inset-0 bg-gradient-to-t from-[#211b2d] via-black/10 to-transparent" />
+
+                                  <span
+                                    className={`absolute left-5 top-5 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest backdrop-blur-xl ${categoryStyle.border} ${categoryStyle.bg} ${categoryStyle.text}`}
+                                  >
+                                    {event.category}
+                                  </span>
+
+                                </div>
+                              ) : (
+                                <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-orange-400/15 via-pink-400/10 to-violet-500/15">
+
+                                  <div className="absolute h-40 w-40 rounded-full bg-pink-500/15 blur-3xl" />
+
+                                  <span className="relative text-7xl transition duration-500 group-hover:scale-125">
+                                    {getCategoryEmoji(
+                                      event.category
+                                    )}
+                                  </span>
+
+                                  <span
+                                    className={`absolute left-5 top-5 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${categoryStyle.border} ${categoryStyle.bg} ${categoryStyle.text}`}
+                                  >
+                                    {event.category}
+                                  </span>
+
+                                </div>
+                              )}
+
+                              <div className="p-6">
+
+                                <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
+                                  {event.date}
+                                  {" · "}
+                                  {event.time}
+                                </p>
+
+                                <h4 className="mt-3 text-2xl font-black leading-tight">
+                                  {event.title}
+                                </h4>
+
+                                <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/40">
+                                  {event.description}
+                                </p>
+
+                                <EventCountdown
+                                  date={event.date}
+                                  time={event.time}
+                                  compact
                                 />
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-5">
 
-                                <span className="absolute left-5 top-5 rounded-full bg-black/50 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
-                                  {event.category}
-                                </span>
+                                  <span className="max-w-[150px] truncate text-xs text-white/35">
+                                    📍 {event.venue}
+                                  </span>
 
-                              </div>
-                            ) : (
-                              <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-fuchsia-500/20 via-purple-500/10 to-cyan-500/20">
+                                  <a
+                                    href={`/events/${event.id}`}
+                                    className="text-sm font-black text-white transition group-hover:text-orange-300"
+                                  >
+                                    Open →
+                                  </a>
 
-                                <div className="absolute h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
-
-                                <span className="relative text-7xl transition duration-500 group-hover:scale-125">
-                                  {event.category ===
-                                  "Technical"
-                                    ? "💻"
-                                    : event.category ===
-                                        "Cultural"
-                                      ? "🎨"
-                                      : event.category ===
-                                          "Sports"
-                                        ? "🏆"
-                                        : event.category ===
-                                            "Workshop"
-                                          ? "🛠️"
-                                          : event.category ===
-                                              "Competition"
-                                            ? "⚡"
-                                            : event.category ===
-                                                "Club"
-                                              ? "👥"
-                                              : "🎉"}
-                                </span>
-
-                                <span className="absolute left-5 top-5 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black tracking-widest backdrop-blur">
-                                  {event.category}
-                                </span>
-
-                              </div>
-                            )}
-
-                            <div className="p-6">
-
-                              <p className="text-xs font-bold text-fuchsia-400">
-                                {event.date} ·{" "}
-                                {event.time}
-                              </p>
-
-                              <h4 className="mt-3 text-2xl font-black">
-                                {event.title}
-                              </h4>
-
-                              <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/40">
-                                {event.description}
-                              </p>
-
-                              <EventCountdown
-                                date={event.date}
-                                time={event.time}
-                                compact
-                              />
-
-                              <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
-
-                                <span className="text-xs text-white/40">
-                                  📍 {event.venue}
-                                </span>
-
-                                <a
-                                  href={`/events/${event.id}`}
-                                  className="text-sm font-black transition group-hover:text-fuchsia-400"
-                                >
-                                  View Event →
-                                </a>
+                                </div>
 
                               </div>
 
-                            </div>
-
-                          </motion.article>
-                        )
+                            </motion.article>
+                          );
+                        }
                       )}
 
                     </motion.div>
-
                   </div>
                 )}
 
@@ -1613,16 +1710,15 @@ export default function Home() {
             )}
 
         </div>
-
       </section>
 
-      {/* ========================================================
+      {/* ======================================================
           CLUBS
-      ======================================================== */}
+      ====================================================== */}
 
       <section
         id="clubs"
-        className="px-6 pb-24 md:px-12"
+        className="relative z-10 px-6 pb-24 md:px-12"
       >
 
         <motion.div
@@ -1633,44 +1729,92 @@ export default function Home() {
             amount: 0.2,
           }}
           variants={fadeUp}
-          className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-cyan-500/5 p-8 md:p-16"
+          className="relative mx-auto max-w-7xl overflow-hidden rounded-[2.25rem] border border-white/10 bg-gradient-to-br from-orange-400/[0.13] via-pink-400/[0.08] to-violet-400/[0.12] p-8 md:p-16"
         >
 
-          <p className="text-sm font-black tracking-[0.25em] text-cyan-400">
-            FIND YOUR PEOPLE
-          </p>
+          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-orange-400/10 blur-[100px]" />
 
-          <div className="mt-4 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+          <div className="relative">
 
-            <h3 className="max-w-2xl text-5xl font-black tracking-tight md:text-6xl">
-              Clubs, communities & chaos.
-            </h3>
+            <div className="flex items-center gap-3">
 
-            <button className="w-fit rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:scale-105">
-              Explore Clubs →
-            </button>
+              <span className="text-2xl">
+                🪩
+              </span>
 
-          </div>
+              <p className="text-[10px] font-black tracking-[0.3em] text-orange-200">
+                FIND YOUR PEOPLE
+              </p>
 
-          <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+            </div>
 
-            {[
-              "💻 Coding",
-              "🎸 Music",
-              "🎨 Arts",
-              "🏆 Sports",
-            ].map((club) => (
-              <motion.div
-                key={club}
-                whileHover={{
-                  y: -5,
-                  scale: 1.02,
-                }}
-                className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm font-bold transition hover:bg-white/10"
-              >
-                {club}
-              </motion.div>
-            ))}
+            <div className="mt-5 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+
+              <h3 className="max-w-2xl text-5xl font-black tracking-[-0.04em] md:text-7xl">
+                Clubs,
+                <br />
+                communities &
+                <span className="text-orange-300">
+                  {" "}
+                  chaos.
+                </span>
+              </h3>
+
+              <button className="w-fit rounded-full bg-[#fff8f0] px-6 py-3 text-sm font-black text-[#171321] transition hover:-translate-y-1">
+                Explore Clubs →
+              </button>
+
+            </div>
+
+            <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+
+              {[
+                {
+                  name: "Coding",
+                  emoji: "💻",
+                  color: "cyan",
+                },
+                {
+                  name: "Music",
+                  emoji: "🎸",
+                  color: "pink",
+                },
+                {
+                  name: "Arts",
+                  emoji: "🎨",
+                  color: "orange",
+                },
+                {
+                  name: "Sports",
+                  emoji: "🏆",
+                  color: "lime",
+                },
+              ].map((club) => (
+                <motion.div
+                  key={club.name}
+                  whileHover={{
+                    y: -5,
+                    scale: 1.02,
+                  }}
+                  className="group rounded-2xl border border-white/10 bg-[#171321]/40 p-5 backdrop-blur-xl transition hover:bg-white/[0.08]"
+                >
+
+                  <div className="mb-5 text-3xl transition duration-300 group-hover:scale-110">
+                    {club.emoji}
+                  </div>
+
+                  <p className="text-sm font-black">
+                    {club.name}
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/30">
+                    Find your people
+                  </p>
+
+                </motion.div>
+              ))}
+
+            </div>
 
           </div>
 
@@ -1678,13 +1822,13 @@ export default function Home() {
 
       </section>
 
-      {/* ========================================================
+      {/* ======================================================
           ABOUT
-      ======================================================== */}
+      ====================================================== */}
 
       <section
         id="about"
-        className="px-6 pb-24 md:px-12"
+        className="relative z-10 px-6 pb-24 md:px-12"
       >
 
         <motion.div
@@ -1695,22 +1839,35 @@ export default function Home() {
             amount: 0.2,
           }}
           variants={fadeUp}
-          className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 p-8 md:p-16"
+          className="relative mx-auto max-w-7xl overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#211b2d]/75 p-8 backdrop-blur-xl md:p-16"
         >
 
-          <div className="grid gap-12 md:grid-cols-[1.4fr_0.8fr] md:items-center">
+          <div className="absolute right-[-100px] top-[-100px] h-72 w-72 rounded-full bg-cyan-400/10 blur-[100px]" />
+
+          <div className="relative grid gap-12 md:grid-cols-[1.4fr_0.8fr] md:items-center">
 
             <div>
 
-              <p className="text-sm font-black tracking-[0.25em] text-fuchsia-400">
-                ABOUT CAMPUS VIBE
-              </p>
+              <div className="flex items-center gap-3">
 
-              <h3 className="mt-4 max-w-3xl text-5xl font-black tracking-tight md:text-6xl">
-                College happens beyond the classroom.
+                <span className="h-px w-8 bg-cyan-300" />
+
+                <p className="text-[10px] font-black tracking-[0.3em] text-cyan-200">
+                  ABOUT CAMPUS VIBE
+                </p>
+
+              </div>
+
+              <h3 className="mt-5 max-w-3xl text-5xl font-black tracking-[-0.04em] md:text-6xl">
+                College happens
+                <span className="text-cyan-300">
+                  {" "}
+                  beyond
+                </span>{" "}
+                the classroom.
               </h3>
 
-              <p className="mt-6 max-w-3xl text-lg leading-relaxed text-white/50">
+              <p className="mt-7 max-w-3xl text-base leading-8 text-white/45">
                 Campus Vibe is built to bring
                 the energy of Sreenidhi University
                 events into one place. From technical
@@ -1722,7 +1879,7 @@ export default function Home() {
                 part of it.
               </p>
 
-              <p className="mt-5 max-w-3xl text-lg leading-relaxed text-white/50">
+              <p className="mt-5 max-w-3xl text-base leading-8 text-white/45">
                 No more missing an event because you
                 heard about it too late. Find what's
                 happening, check the details, register,
@@ -1731,23 +1888,27 @@ export default function Home() {
 
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/20 p-7 md:p-8">
+            <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-cyan-300/[0.08] to-violet-400/[0.08] p-7 md:p-8">
 
-              <p className="text-xs font-black tracking-[0.25em] text-cyan-400">
+              <div className="absolute -right-10 -top-10 text-8xl text-white/[0.025]">
+                ⚡
+              </div>
+
+              <p className="relative text-[10px] font-black tracking-[0.3em] text-cyan-300">
                 BUILT BY
               </p>
 
-              <h4 className="mt-4 text-3xl font-black">
+              <h4 className="relative mt-4 text-3xl font-black">
                 K. Suhaas Kashyap
               </h4>
 
-              <p className="mt-2 text-white/40">
+              <p className="relative mt-2 text-sm text-white/35">
                 First Year · Sreenidhi University
               </p>
 
               <div className="my-7 h-px bg-white/10" />
 
-              <p className="text-sm leading-7 text-white/50">
+              <p className="text-sm leading-7 text-white/45">
                 Created with the idea that college
                 isn't just about classrooms and
                 assignments — it's about the people
@@ -1756,13 +1917,18 @@ export default function Home() {
                 memories you make along the way.
               </p>
 
-              <p className="mt-6 text-lg font-black text-white">
+              <p className="mt-6 text-lg font-black leading-7">
                 Your campus.
                 <br />
-                Your people.
+                <span className="text-orange-300">
+                  Your people.
+                </span>
                 <br />
-                Your vibe.
-                <span className="ml-2 text-fuchsia-400">
+                <span className="text-pink-300">
+                  Your vibe.
+                </span>
+
+                <span className="ml-2">
                   ⚡
                 </span>
               </p>
@@ -1775,20 +1941,43 @@ export default function Home() {
 
       </section>
 
-      {/* ========================================================
+      {/* ======================================================
           FOOTER
-      ======================================================== */}
+      ====================================================== */}
 
-      <footer className="border-t border-white/10 px-6 py-10 md:px-12">
+      <footer className="relative z-10 border-t border-white/10 px-6 py-10 md:px-12">
 
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 text-sm text-white/40 md:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 md:flex-row md:items-center">
 
-          <p>
+          <div>
+
+            <div className="flex items-center gap-2">
+
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-pink-500 text-xs">
+                ⚡
+              </div>
+
+              <p className="font-black">
+                Campus Vibe
+              </p>
+
+            </div>
+
+            <p className="mt-2 text-xs text-white/25">
+              Sreenidhi University
+            </p>
+
+          </div>
+
+          <p className="text-xs font-medium text-white/30">
             © 2026 Sreenidhi University Campus Vibe
           </p>
 
-          <p>
-            Built for the students. ⚡
+          <p className="text-sm font-bold text-white/35">
+            Built for the students.{" "}
+            <span className="text-orange-300">
+              ⚡
+            </span>
           </p>
 
         </div>
