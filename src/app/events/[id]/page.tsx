@@ -302,8 +302,12 @@ export default function EventDetailPage() {
     typeof event.description === "string" &&
     event.description.trim().length > 0;
 
+  const eventDetailImage =
+    event.detailImageUrl || event.imageUrl;
+
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-[#171321] text-[#fff8f0]">
+      {/* BACKGROUND EFFECTS */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <motion.div
           animate={{
@@ -337,6 +341,7 @@ export default function EventDetailPage() {
       </div>
 
       <div className="relative w-full">
+        {/* BACK BUTTON */}
         <div className="px-5 py-6 sm:px-8 md:px-12 lg:px-20">
           <motion.button
             initial={{ opacity: 0, x: -20 }}
@@ -354,592 +359,598 @@ export default function EventDetailPage() {
           </motion.button>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
+        {/* ===================================================== */}
+        {/* EVENT DETAIL IMAGE */}
+        {/* ===================================================== */}
+
+        <motion.section
+          initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
-          className="w-full"
+          className="relative w-full overflow-hidden border-y border-[#fff8f0]/10 bg-[#0d0a12]"
         >
-          {/* HERO */}
-          <div className="relative grid overflow-hidden border-y border-[#fff8f0]/10 bg-[#fff8f0]/[0.035] md:grid-cols-2">
-            {/* LEFT — FULL EVENT IMAGE */}
-            <div className="relative flex min-h-[320px] items-center justify-center overflow-hidden bg-[#0f0b16] p-5 sm:p-8 md:min-h-[500px] md:p-10">
-              {event.imageUrl ? (
-                <img
-                  src={event.imageUrl}
-                  alt={event.title || "Event image"}
-                  className="relative z-10 max-h-[460px] w-full object-contain"
-                />
-              ) : (
-                <div className="relative z-10 flex h-full min-h-[320px] w-full items-center justify-center">
-                  <span className="text-7xl opacity-20">
-                    ⚡
-                  </span>
+          {eventDetailImage ? (
+            <div className="relative flex w-full justify-center">
+              <img
+                src={eventDetailImage}
+                alt={event.title || "Event image"}
+                className="block h-auto max-h-[850px] w-full object-contain"
+              />
+
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#171321]/20 via-transparent to-transparent" />
+            </div>
+          ) : (
+            <div className="flex min-h-[420px] w-full items-center justify-center bg-[#0d0a12]">
+              <div className="text-center">
+                <div className="text-7xl opacity-20">
+                  ⚡
                 </div>
-              )}
 
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,122,69,0.12),transparent_35%),radial-gradient(circle_at_80%_80%,rgba(155,109,255,0.12),transparent_40%)]" />
-
-              <motion.div
-                animate={{
-                  scale: [1, 1.15, 1],
-                  opacity: [0.15, 0.3, 0.15],
-                }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#ff7a45]/10 blur-3xl"
-              />
+                <p className="mt-4 text-sm font-bold text-[#fff8f0]/25">
+                  No event image available
+                </p>
+              </div>
             </div>
+          )}
+        </motion.section>
 
-            {/* RIGHT — TITLE + OPTIONAL DESCRIPTION */}
-            <div className="relative flex min-h-[500px] items-center justify-center overflow-hidden px-6 py-16 text-center sm:px-10 md:px-12 lg:px-16">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,122,69,0.16),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(155,109,255,0.15),transparent_32%),radial-gradient(circle_at_60%_100%,rgba(66,232,212,0.08),transparent_35%)]" />
+        {/* ===================================================== */}
+        {/* TITLE + OPTIONAL DESCRIPTION */}
+        {/* ===================================================== */}
 
-              <motion.div
-                animate={{
-                  scale: [1, 1.15, 1],
-                  opacity: [0.25, 0.45, 0.25],
-                }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#ff7a45]/15 blur-3xl"
-              />
+        <motion.section
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: 0.1,
+            duration: 0.7,
+          }}
+          className="relative overflow-hidden border-b border-[#fff8f0]/10 px-5 py-16 sm:px-8 md:px-12 md:py-24 lg:px-20"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,122,69,0.13),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(155,109,255,0.13),transparent_32%),radial-gradient(circle_at_60%_100%,rgba(66,232,212,0.07),transparent_35%)]" />
 
-              <motion.div
-                animate={{
-                  scale: [1.1, 1, 1.1],
-                  opacity: [0.2, 0.4, 0.2],
-                }}
-                transition={{
-                  duration: 7,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="pointer-events-none absolute -bottom-28 -left-24 h-80 w-80 rounded-full bg-[#9b6dff]/15 blur-3xl"
-              />
+          <motion.div
+            animate={{
+              scale: [1, 1.15, 1],
+              opacity: [0.2, 0.35, 0.2],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#ff7a45]/10 blur-3xl"
+          />
 
-              <div className="pointer-events-none absolute right-[12%] top-[18%] h-2 w-2 rounded-full bg-[#ffd166]" />
+          <motion.div
+            animate={{
+              scale: [1.1, 1, 1.1],
+              opacity: [0.15, 0.3, 0.15],
+            }}
+            transition={{
+              duration: 7,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -bottom-28 -left-24 h-80 w-80 rounded-full bg-[#9b6dff]/10 blur-3xl"
+          />
 
-              <div className="pointer-events-none absolute right-[18%] top-[25%] h-1.5 w-1.5 rounded-full bg-[#42e8d4]" />
+          <div className="pointer-events-none absolute right-[12%] top-[18%] h-2 w-2 rounded-full bg-[#ffd166]" />
 
-              <div className="pointer-events-none absolute bottom-[20%] left-[14%] h-2 w-2 rounded-full bg-[#ff4f81]" />
+          <div className="pointer-events-none absolute right-[18%] top-[25%] h-1.5 w-1.5 rounded-full bg-[#42e8d4]" />
 
-              <motion.div
-                variants={stagger}
-                initial="hidden"
-                animate="show"
-                className="relative flex w-full flex-col items-center justify-center"
+          <div className="pointer-events-none absolute bottom-[20%] left-[14%] h-2 w-2 rounded-full bg-[#ff4f81]" />
+
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            animate="show"
+            className="relative mx-auto flex w-full max-w-6xl flex-col items-center text-center"
+          >
+            <motion.h1
+              variants={fadeUp}
+              className={`font-black leading-[0.92] tracking-[-0.055em] ${
+                hasDescription
+                  ? "text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
+                  : "text-6xl sm:text-7xl md:text-8xl lg:text-[9rem]"
+              }`}
+            >
+              {event.title}
+            </motion.h1>
+
+            {hasDescription && (
+              <motion.p
+                variants={fadeUp}
+                className="mt-8 max-w-4xl text-base leading-8 text-[#fff8f0]/50 md:text-lg"
               >
-                <motion.h1
-                  variants={fadeUp}
-                  className={`font-black leading-[0.92] tracking-[-0.055em] ${
-                    hasDescription
-                      ? "max-w-3xl text-4xl sm:text-5xl md:text-6xl lg:text-7xl"
-                      : "max-w-4xl text-6xl sm:text-7xl md:text-8xl lg:text-9xl"
-                  }`}
-                >
-                  {event.title}
-                </motion.h1>
+                {event.description}
+              </motion.p>
+            )}
+          </motion.div>
+        </motion.section>
 
-                {hasDescription && (
-                  <motion.p
-                    variants={fadeUp}
-                    className="mt-7 max-w-2xl text-base leading-8 text-[#fff8f0]/50 md:text-lg"
-                  >
-                    {event.description}
-                  </motion.p>
-                )}
-              </motion.div>
+        {/* EVERYTHING BELOW */}
+        <div className="w-full px-5 py-9 sm:px-8 md:px-12 md:py-14 lg:px-20">
+          {/* COUNTDOWN */}
+          <motion.div
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: 0.15,
+              duration: 0.6,
+            }}
+            className="relative overflow-hidden rounded-[2rem] border border-[#ffd166]/20 bg-[#ffd166]/[0.055] p-5 shadow-2xl shadow-black/10 md:p-7"
+          >
+            <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#ffd166]/10 blur-3xl" />
+
+            <div className="relative">
+              <p className="mb-4 text-xs font-black tracking-[0.3em] text-[#ffd166]">
+                THE CLOCK IS TICKING
+              </p>
+
+              <EventCountdown
+                date={event.date}
+                time={event.time}
+              />
             </div>
-          </div>
+          </motion.div>
 
-          {/* COUNTDOWN + EVENT DETAILS */}
-          <div className="w-full px-5 py-9 sm:px-8 md:px-12 md:py-14 lg:px-20">
+          {/* DATE / TIME / VENUE */}
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            animate="show"
+            className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
             <motion.div
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
+              variants={fadeUp}
+              whileHover={{ y: -5 }}
+              className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#ff7a45]/30 hover:bg-[#fff8f0]/[0.065]"
+            >
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ff7a45]/10 text-xl">
+                📅
+              </div>
+
+              <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
+                DATE
+              </p>
+
+              <p className="mt-2 text-lg font-black">
+                {event.date || "TBA"}
+              </p>
+            </motion.div>
+
+            <motion.div
+              variants={fadeUp}
+              whileHover={{ y: -5 }}
+              className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#9b6dff]/30 hover:bg-[#fff8f0]/[0.065]"
+            >
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9b6dff]/10 text-xl">
+                🕐
+              </div>
+
+              <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
+                TIME
+              </p>
+
+              <p className="mt-2 text-lg font-black">
+                {event.time || "TBA"}
+              </p>
+            </motion.div>
+
+            <motion.div
+              variants={fadeUp}
+              whileHover={{ y: -5 }}
+              className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#42e8d4]/30 hover:bg-[#fff8f0]/[0.065] sm:col-span-2 lg:col-span-1"
+            >
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#42e8d4]/10 text-xl">
+                📍
+              </div>
+
+              <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
+                VENUE
+              </p>
+
+              <p className="mt-2 text-lg font-black">
+                {event.venue || "TBA"}
+              </p>
+            </motion.div>
+          </motion.div>
+
+          {/* ABOUT — ONLY WHEN DESCRIPTION EXISTS */}
+          {hasDescription && (
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="show"
+              viewport={{
+                once: true,
+                amount: 0.2,
+              }}
+              className="mt-14"
+            >
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-[#ff4f81]" />
+
+                <p className="text-xs font-black tracking-[0.3em] text-[#ff4f81]">
+                  ABOUT THIS EVENT
+                </p>
+              </div>
+
+              <h2 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">
+                What's happening?
+              </h2>
+
+              <p className="mt-5 max-w-4xl whitespace-pre-wrap text-base leading-8 text-[#fff8f0]/50">
+                {event.description}
+              </p>
+            </motion.div>
+          )}
+
+          {/* REGISTRATION */}
+          {interactionType === "registration" && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: 30,
+              }}
+              whileInView={{
+                opacity: 1,
+                y: 0,
+              }}
+              viewport={{
+                once: true,
+                amount: 0.2,
+              }}
               transition={{
-                delay: 0.15,
                 duration: 0.6,
               }}
-              className="relative overflow-hidden rounded-[2rem] border border-[#ffd166]/20 bg-[#ffd166]/[0.055] p-5 shadow-2xl shadow-black/10 md:p-7"
+              className="relative mt-14 overflow-hidden rounded-[2rem] border border-[#ff7a45]/20 bg-[#ff7a45]/[0.07] p-7 md:p-9"
             >
-              <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#ffd166]/10 blur-3xl" />
+              <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#ff7a45]/15 blur-3xl" />
 
-              <div className="relative">
-                <p className="mb-4 text-xs font-black tracking-[0.3em] text-[#ffd166]">
-                  THE CLOCK IS TICKING
-                </p>
+              <div className="relative flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#ff7a45]" />
 
-                <EventCountdown
-                  date={event.date}
-                  time={event.time}
-                />
-              </div>
-            </motion.div>
+                    <p className="text-xs font-black tracking-[0.25em] text-[#ff7a45]">
+                      READY TO JOIN?
+                    </p>
+                  </div>
 
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              animate="show"
-              className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              <motion.div
-                variants={fadeUp}
-                whileHover={{ y: -5 }}
-                className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#ff7a45]/30 hover:bg-[#fff8f0]/[0.065]"
-              >
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ff7a45]/10 text-xl">
-                  📅
-                </div>
+                  <h2 className="mt-3 text-3xl font-black tracking-tight">
+                    Save your spot.
+                  </h2>
 
-                <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
-                  DATE
-                </p>
-
-                <p className="mt-2 text-lg font-black">
-                  {event.date || "TBA"}
-                </p>
-              </motion.div>
-
-              <motion.div
-                variants={fadeUp}
-                whileHover={{ y: -5 }}
-                className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#9b6dff]/30 hover:bg-[#fff8f0]/[0.065]"
-              >
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9b6dff]/10 text-xl">
-                  🕐
-                </div>
-
-                <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
-                  TIME
-                </p>
-
-                <p className="mt-2 text-lg font-black">
-                  {event.time || "TBA"}
-                </p>
-              </motion.div>
-
-              <motion.div
-                variants={fadeUp}
-                whileHover={{ y: -5 }}
-                className="group rounded-3xl border border-[#fff8f0]/10 bg-[#fff8f0]/[0.045] p-5 transition hover:border-[#42e8d4]/30 hover:bg-[#fff8f0]/[0.065] sm:col-span-2 lg:col-span-1"
-              >
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#42e8d4]/10 text-xl">
-                  📍
-                </div>
-
-                <p className="text-[10px] font-black tracking-[0.25em] text-[#fff8f0]/30">
-                  VENUE
-                </p>
-
-                <p className="mt-2 text-lg font-black">
-                  {event.venue || "TBA"}
-                </p>
-              </motion.div>
-            </motion.div>
-
-            {/* ABOUT */}
-            {hasDescription && (
-              <motion.div
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="show"
-                viewport={{
-                  once: true,
-                  amount: 0.2,
-                }}
-                className="mt-14"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="h-2 w-2 rounded-full bg-[#ff4f81]" />
-
-                  <p className="text-xs font-black tracking-[0.3em] text-[#ff4f81]">
-                    ABOUT THIS EVENT
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-[#fff8f0]/45">
+                    Register for this event and be part of the campus experience.
                   </p>
                 </div>
 
-                <h2 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">
-                  What's happening?
-                </h2>
+                <motion.button
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow:
+                      "0 18px 40px rgba(255,122,69,0.22)",
+                  }}
+                  whileTap={{
+                    scale: 0.96,
+                  }}
+                  onClick={() =>
+                    router.push(
+                      `/events/${event.id}/register`
+                    )
+                  }
+                  className="shrink-0 rounded-2xl bg-[#ff7a45] px-8 py-4 font-black text-[#171321] shadow-xl shadow-[#ff7a45]/10"
+                >
+                  Register Now →
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
 
-                <p className="mt-5 max-w-4xl whitespace-pre-wrap text-base leading-8 text-[#fff8f0]/50">
-                  {event.description}
-                </p>
-              </motion.div>
-            )}
+          {/* POLL */}
+          {interactionType === "poll" && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: 30,
+              }}
+              whileInView={{
+                opacity: 1,
+                y: 0,
+              }}
+              viewport={{
+                once: true,
+                amount: 0.15,
+              }}
+              transition={{
+                duration: 0.6,
+              }}
+              className="relative mt-14 overflow-hidden rounded-[2rem] border border-[#42e8d4]/20 bg-[#42e8d4]/[0.055] p-7 md:p-9"
+            >
+              <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#42e8d4]/10 blur-3xl" />
 
-            {/* REGISTRATION */}
-            {interactionType === "registration" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 30,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.2,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="relative mt-14 overflow-hidden rounded-[2rem] border border-[#ff7a45]/20 bg-[#ff7a45]/[0.07] p-7 md:p-9"
-              >
-                <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#ff7a45]/15 blur-3xl" />
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#42e8d4]" />
 
-                <div className="relative flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#ff7a45]" />
-
-                      <p className="text-xs font-black tracking-[0.25em] text-[#ff7a45]">
-                        READY TO JOIN?
-                      </p>
-                    </div>
-
-                    <h2 className="mt-3 text-3xl font-black tracking-tight">
-                      Save your spot.
-                    </h2>
-
-                    <p className="mt-2 max-w-xl text-sm leading-6 text-[#fff8f0]/45">
-                      Register for this event and be part of the campus experience.
-                    </p>
-                  </div>
-
-                  <motion.button
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow:
-                        "0 18px 40px rgba(255,122,69,0.22)",
-                    }}
-                    whileTap={{
-                      scale: 0.96,
-                    }}
-                    onClick={() =>
-                      router.push(
-                        `/events/${event.id}/register`
-                      )
-                    }
-                    className="shrink-0 rounded-2xl bg-[#ff7a45] px-8 py-4 font-black text-[#171321] shadow-xl shadow-[#ff7a45]/10"
-                  >
-                    Register Now →
-                  </motion.button>
+                  <p className="text-xs font-black tracking-[0.25em] text-[#42e8d4]">
+                    QUICK POLL
+                  </p>
                 </div>
-              </motion.div>
-            )}
 
-            {/* POLL */}
-            {interactionType === "poll" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 30,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.15,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="relative mt-14 overflow-hidden rounded-[2rem] border border-[#42e8d4]/20 bg-[#42e8d4]/[0.055] p-7 md:p-9"
-              >
-                <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#42e8d4]/10 blur-3xl" />
-
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#42e8d4]" />
-
-                    <p className="text-xs font-black tracking-[0.25em] text-[#42e8d4]">
-                      QUICK POLL
+                {!validPoll ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-5 rounded-2xl border border-[#ffd166]/20 bg-[#ffd166]/[0.05] p-5"
+                  >
+                    <p className="font-bold text-[#ffd166]">
+                      This poll isn't available yet.
                     </p>
-                  </div>
 
-                  {!validPoll ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="mt-5 rounded-2xl border border-[#ffd166]/20 bg-[#ffd166]/[0.05] p-5"
+                    <p className="mt-2 text-sm text-[#fff8f0]/40">
+                      The poll needs a question and at least two valid response options.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <>
+                    <motion.h2
+                      initial={{
+                        opacity: 0,
+                        y: 15,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      className="mt-4 max-w-3xl text-2xl font-black md:text-3xl"
                     >
-                      <p className="font-bold text-[#ffd166]">
-                        This poll isn't available yet.
-                      </p>
+                      {pollQuestion}
+                    </motion.h2>
 
-                      <p className="mt-2 text-sm text-[#fff8f0]/40">
-                        The poll needs a question and at least two valid response options.
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <>
-                      <motion.h2
+                    <p className="mt-2 text-sm leading-6 text-[#fff8f0]/40">
+                      {savedVote
+                        ? "You've already submitted your response."
+                        : "Choose one option below."}
+                    </p>
+
+                    {!currentUser && (
+                      <motion.div
                         initial={{
                           opacity: 0,
-                          y: 15,
+                          scale: 0.97,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          scale: 1,
+                        }}
+                        className="mt-5 rounded-2xl border border-[#ffd166]/20 bg-[#ffd166]/[0.05] p-5"
+                      >
+                        <p className="font-bold text-[#ffd166]">
+                          Log in to vote
+                        </p>
+
+                        <p className="mt-1 text-sm text-[#fff8f0]/40">
+                          You need to be logged in before submitting a response.
+                        </p>
+
+                        <motion.button
+                          whileHover={{
+                            scale: 1.05,
+                          }}
+                          whileTap={{
+                            scale: 0.97,
+                          }}
+                          type="button"
+                          onClick={() =>
+                            router.push("/auth")
+                          }
+                          className="mt-4 rounded-xl bg-[#fff8f0] px-5 py-3 text-sm font-black text-[#171321]"
+                        >
+                          Log In →
+                        </motion.button>
+                      </motion.div>
+                    )}
+
+                    <motion.div
+                      variants={stagger}
+                      initial="hidden"
+                      animate="show"
+                      className="mt-6 grid gap-3"
+                    >
+                      {pollOptions.map(
+                        (option, index) => {
+                          const isSelected =
+                            selectedOption === option ||
+                            savedVote === option;
+
+                          return (
+                            <motion.button
+                              key={`${option}-${index}`}
+                              variants={fadeUp}
+                              whileHover={
+                                !savedVote &&
+                                currentUser
+                                  ? {
+                                      scale: 1.015,
+                                      x: 3,
+                                    }
+                                  : {}
+                              }
+                              whileTap={
+                                !savedVote &&
+                                currentUser
+                                  ? {
+                                      scale: 0.98,
+                                    }
+                                  : {}
+                              }
+                              type="button"
+                              disabled={
+                                !!savedVote ||
+                                voting ||
+                                !currentUser
+                              }
+                              onClick={() => {
+                                setSelectedOption(
+                                  option
+                                );
+                                setVoteMessage("");
+                              }}
+                              className={`group rounded-2xl border p-4 text-left transition ${
+                                isSelected
+                                  ? "border-[#42e8d4]/60 bg-[#42e8d4]/10"
+                                  : "border-[#fff8f0]/10 bg-[#171321]/30 hover:border-[#42e8d4]/40 hover:bg-[#42e8d4]/[0.07]"
+                              } ${
+                                !currentUser ||
+                                !!savedVote
+                                  ? "cursor-default"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <motion.div
+                                  animate={
+                                    isSelected
+                                      ? {
+                                          scale: [
+                                            1,
+                                            1.15,
+                                            1,
+                                          ],
+                                        }
+                                      : {
+                                          scale: 1,
+                                        }
+                                  }
+                                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+                                    isSelected
+                                      ? "bg-[#42e8d4] text-[#171321]"
+                                      : "bg-[#fff8f0]/10 group-hover:bg-[#42e8d4] group-hover:text-[#171321]"
+                                  }`}
+                                >
+                                  {isSelected
+                                    ? "✓"
+                                    : index + 1}
+                                </motion.div>
+
+                                <span className="font-bold">
+                                  {option}
+                                </span>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+                      )}
+                    </motion.div>
+
+                    {currentUser && !savedVote && (
+                      <motion.button
+                        whileHover={{
+                          scale: selectedOption
+                            ? 1.01
+                            : 1,
+                        }}
+                        whileTap={{
+                          scale: selectedOption
+                            ? 0.98
+                            : 1,
+                        }}
+                        type="button"
+                        onClick={submitVote}
+                        disabled={
+                          voting ||
+                          !selectedOption
+                        }
+                        className="mt-6 w-full rounded-2xl bg-[#42e8d4] py-4 font-black text-[#171321] transition hover:bg-[#67f1e1] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {voting
+                          ? "Saving response..."
+                          : "Submit Response →"}
+                      </motion.button>
+                    )}
+
+                    {voteMessage && (
+                      <motion.div
+                        initial={{
+                          opacity: 0,
+                          y: 10,
                         }}
                         animate={{
                           opacity: 1,
                           y: 0,
                         }}
-                        className="mt-4 max-w-3xl text-2xl font-black md:text-3xl"
+                        className={`mt-4 rounded-xl p-4 text-sm ${
+                          voteMessage.includes(
+                            "recorded"
+                          )
+                            ? "bg-[#8be28b]/10 text-[#8be28b]"
+                            : "bg-[#ffd166]/10 text-[#ffd166]"
+                        }`}
                       >
-                        {pollQuestion}
-                      </motion.h2>
-
-                      <p className="mt-2 text-sm leading-6 text-[#fff8f0]/40">
-                        {savedVote
-                          ? "You've already submitted your response."
-                          : "Choose one option below."}
-                      </p>
-
-                      {!currentUser && (
-                        <motion.div
-                          initial={{
-                            opacity: 0,
-                            scale: 0.97,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            scale: 1,
-                          }}
-                          className="mt-5 rounded-2xl border border-[#ffd166]/20 bg-[#ffd166]/[0.05] p-5"
-                        >
-                          <p className="font-bold text-[#ffd166]">
-                            Log in to vote
-                          </p>
-
-                          <p className="mt-1 text-sm text-[#fff8f0]/40">
-                            You need to be logged in before submitting a response.
-                          </p>
-
-                          <motion.button
-                            whileHover={{
-                              scale: 1.05,
-                            }}
-                            whileTap={{
-                              scale: 0.97,
-                            }}
-                            type="button"
-                            onClick={() =>
-                              router.push("/auth")
-                            }
-                            className="mt-4 rounded-xl bg-[#fff8f0] px-5 py-3 text-sm font-black text-[#171321]"
-                          >
-                            Log In →
-                          </motion.button>
-                        </motion.div>
-                      )}
-
-                      <motion.div
-                        variants={stagger}
-                        initial="hidden"
-                        animate="show"
-                        className="mt-6 grid gap-3"
-                      >
-                        {pollOptions.map(
-                          (option, index) => {
-                            const isSelected =
-                              selectedOption === option ||
-                              savedVote === option;
-
-                            return (
-                              <motion.button
-                                key={`${option}-${index}`}
-                                variants={fadeUp}
-                                whileHover={
-                                  !savedVote &&
-                                  currentUser
-                                    ? {
-                                        scale: 1.015,
-                                        x: 3,
-                                      }
-                                    : {}
-                                }
-                                whileTap={
-                                  !savedVote &&
-                                  currentUser
-                                    ? {
-                                        scale: 0.98,
-                                      }
-                                    : {}
-                                }
-                                type="button"
-                                disabled={
-                                  !!savedVote ||
-                                  voting ||
-                                  !currentUser
-                                }
-                                onClick={() => {
-                                  setSelectedOption(
-                                    option
-                                  );
-                                  setVoteMessage("");
-                                }}
-                                className={`group rounded-2xl border p-4 text-left transition ${
-                                  isSelected
-                                    ? "border-[#42e8d4]/60 bg-[#42e8d4]/10"
-                                    : "border-[#fff8f0]/10 bg-[#171321]/30 hover:border-[#42e8d4]/40 hover:bg-[#42e8d4]/[0.07]"
-                                } ${
-                                  !currentUser ||
-                                  !!savedVote
-                                    ? "cursor-default"
-                                    : ""
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <motion.div
-                                    animate={
-                                      isSelected
-                                        ? {
-                                            scale: [
-                                              1,
-                                              1.15,
-                                              1,
-                                            ],
-                                          }
-                                        : {
-                                            scale: 1,
-                                          }
-                                    }
-                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-                                      isSelected
-                                        ? "bg-[#42e8d4] text-[#171321]"
-                                        : "bg-[#fff8f0]/10 group-hover:bg-[#42e8d4] group-hover:text-[#171321]"
-                                    }`}
-                                  >
-                                    {isSelected
-                                      ? "✓"
-                                      : index + 1}
-                                  </motion.div>
-
-                                  <span className="font-bold">
-                                    {option}
-                                  </span>
-                                </div>
-                              </motion.button>
-                            );
-                          }
-                        )}
+                        {voteMessage}
                       </motion.div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
 
-                      {currentUser && !savedVote && (
-                        <motion.button
-                          whileHover={{
-                            scale: selectedOption
-                              ? 1.01
-                              : 1,
-                          }}
-                          whileTap={{
-                            scale: selectedOption
-                              ? 0.98
-                              : 1,
-                          }}
-                          type="button"
-                          onClick={submitVote}
-                          disabled={
-                            voting ||
-                            !selectedOption
-                          }
-                          className="mt-6 w-full rounded-2xl bg-[#42e8d4] py-4 font-black text-[#171321] transition hover:bg-[#67f1e1] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {voting
-                            ? "Saving response..."
-                            : "Submit Response →"}
-                        </motion.button>
-                      )}
+          {/* NO INTERACTION */}
+          {interactionType === "none" && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: 25,
+              }}
+              whileInView={{
+                opacity: 1,
+                y: 0,
+              }}
+              viewport={{
+                once: true,
+                amount: 0.2,
+              }}
+              transition={{
+                duration: 0.6,
+              }}
+              className="mt-14 rounded-[2rem] border border-[#fff8f0]/10 bg-[#fff8f0]/[0.035] p-7 md:p-8"
+            >
+              <div className="flex items-center gap-4">
+                <motion.div
+                  animate={{
+                    y: [0, -5, 0],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                  }}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ffd166]/10 text-xl"
+                >
+                  👀
+                </motion.div>
 
-                      {voteMessage && (
-                        <motion.div
-                          initial={{
-                            opacity: 0,
-                            y: 10,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                          }}
-                          className={`mt-4 rounded-xl p-4 text-sm ${
-                            voteMessage.includes(
-                              "recorded"
-                            )
-                              ? "bg-[#8be28b]/10 text-[#8be28b]"
-                              : "bg-[#ffd166]/10 text-[#ffd166]"
-                          }`}
-                        >
-                          {voteMessage}
-                        </motion.div>
-                      )}
-                    </>
-                  )}
+                <div>
+                  <p className="text-xs font-black tracking-[0.25em] text-[#fff8f0]/40">
+                    EVENT INFO
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-black">
+                    Just come and enjoy it.
+                  </h2>
+
+                  <p className="mt-1 text-sm text-[#fff8f0]/40">
+                    No registration or response is required for this event.
+                  </p>
                 </div>
-              </motion.div>
-            )}
-
-            {/* NO INTERACTION */}
-            {interactionType === "none" && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 25,
-                }}
-                whileInView={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                viewport={{
-                  once: true,
-                  amount: 0.2,
-                }}
-                transition={{
-                  duration: 0.6,
-                }}
-                className="mt-14 rounded-[2rem] border border-[#fff8f0]/10 bg-[#fff8f0]/[0.035] p-7 md:p-8"
-              >
-                <div className="flex items-center gap-4">
-                  <motion.div
-                    animate={{
-                      y: [0, -5, 0],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                    }}
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ffd166]/10 text-xl"
-                  >
-                    👀
-                  </motion.div>
-
-                  <div>
-                    <p className="text-xs font-black tracking-[0.25em] text-[#fff8f0]/40">
-                      EVENT INFO
-                    </p>
-
-                    <h2 className="mt-1 text-xl font-black">
-                      Just come and enjoy it.
-                    </h2>
-
-                    <p className="mt-1 text-sm text-[#fff8f0]/40">
-                      No registration or response is required for this event.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
+              </div>
+            </motion.div>
+          )}
+        </div>
 
         {/* BOTTOM BUTTONS */}
         <div className="px-5 py-10 sm:px-8 md:px-12 lg:px-20">
